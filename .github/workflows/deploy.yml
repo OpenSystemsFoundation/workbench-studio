@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - claude/workbench-mobile-desktop-gdoazk
   workflow_dispatch:
 
 # Allow the workflow to publish to Pages
@@ -33,6 +32,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Typecheck
+        run: npm run check
 
       - name: Run unit tests
         run: npm test
