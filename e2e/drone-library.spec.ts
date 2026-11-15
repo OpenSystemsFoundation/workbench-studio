@@ -4,6 +4,7 @@ test.use({ viewport: { width: 1280, height: 900 } });
 
 async function openMetronome(page: Page) {
   await page.getByTestId('desktop-tabs').getByRole('tab', { name: 'metronome' }).click();
+  await page.getByTestId('metronome-tab-drone').click();
   await expect(page.getByTestId('metronome-drone')).toBeVisible();
 }
 
@@ -149,6 +150,7 @@ test.describe('drone: ready-made and saved plans', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await openMetronome(page);
+    await page.getByTestId('metronome-tab-trainer').click();
     await page.getByTestId('metronome-automation').getByRole('tab', { name: 'Plan' }).click();
   });
 
@@ -198,6 +200,7 @@ test.describe('drone: ready-made and saved plans', () => {
 
     await page.reload();
     await openMetronome(page);
+    await page.getByTestId('metronome-tab-trainer').click();
     await page.getByTestId('metronome-automation').getByRole('tab', { name: 'Plan' }).click();
     await saved.getByRole('button', { name: /^Relatives/ }).click();
     await expect(page.getByTestId('metronome-plan').locator('li')).toHaveCount(24);
@@ -216,6 +219,7 @@ test.describe('drone: remembered settings and saved sounds', () => {
     await drone.getByRole('tab', { name: 'Triad' }).click();
     await drone.getByRole('tab', { name: 'Own key' }).click();
     await drone.getByLabel('Key', { exact: true }).selectOption({ label: 'F' });
+    await page.getByTestId('metronome-tab-trainer').click();
     await page.getByTestId('metronome-automation').getByRole('tab', { name: 'Plan' }).click();
     await page.getByTestId('metronome-plan-add').click();
     await page.waitForTimeout(600); // settings are written a beat after the last change
@@ -225,6 +229,7 @@ test.describe('drone: remembered settings and saved sounds', () => {
     await expect(drone.getByRole('tab', { name: 'Nebula' })).toHaveAttribute('aria-selected', 'true');
     await expect(drone.getByRole('tab', { name: 'Triad' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByTestId('metronome-drone-key')).toContainText('F Major');
+    await page.getByTestId('metronome-tab-trainer').click();
     await page.getByTestId('metronome-automation').getByRole('tab', { name: 'Plan' }).click();
     await expect(page.getByTestId('metronome-plan').locator('li')).toHaveCount(5);
   });

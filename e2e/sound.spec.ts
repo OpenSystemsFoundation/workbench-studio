@@ -107,6 +107,7 @@ test.describe('the sound engine', () => {
     await page.goto('/');
     await page.getByTestId('studio-play').click();                  // the band
     await page.getByTestId('desktop-tabs').getByRole('tab', { name: 'metronome' }).click();
+    await page.getByTestId('metronome-tab-drone').click();
     await page.getByTestId('metronome-drone-toggle').click();       // the drone
     await expect(page.getByTestId('metronome-drone-toggle')).toHaveText(/Stop drone/);
     await page.getByTestId('metronome-play').click();               // the click

@@ -24,6 +24,7 @@ test.describe('metronome drone', () => {
     await page.goto('/');
     await expect(page.getByText('Workbench Studio')).toBeVisible();
     await page.getByTestId('desktop-tabs').getByRole('tab', { name: 'metronome' }).click();
+    await page.getByTestId('metronome-tab-drone').click();
     await expect(page.getByTestId('metronome-drone')).toBeVisible();
   });
 
