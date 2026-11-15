@@ -25,7 +25,7 @@ import {
   drumTemplates, composeGrid, swingDelaySteps, templateVoices, inKitOrder,
   type DrumVoiceId, type DrumGrid, type DrumLayerPart,
 } from './engine/drums';
-import { AudioEngine } from './audio';
+import { AudioEngine, DEFAULT_KEYS, KEYS_VOICES, type Instrument } from './audio';
 import { MetronomeStore } from './metronome/store.svelte';
 import { guideForChord, type DroneGuide } from './metronome/drone/guide';
 import { analyseChanges } from './engine/keycenters';
@@ -51,6 +51,7 @@ export type ChordSlot = 'half' | 'bar';
 // at an exact time on the audio clock, accumulated from the slot before it.
 // A late or jittery wake-up then changes when we *schedule*, never when
 // anything *sounds*.
+const KEYS_KEY = 'workbench.keys';
 const LOOKAHEAD_MS = 25;
 const SCHEDULE_AHEAD_S = 0.12;
 
@@ -368,6 +369,10 @@ export class WorkbenchStore {
     // exactly that state.
     const saved = loadSession();
     if (saved) this.restoreSession(saved);
+    try {
+      const keys = typeof localStorage !== 'undefined' ? localStorage.getItem(KEYS_KEY) : null;
+      if (keys && KEYS_VOICES.some((v) => v.id === keys)) { this.keysSound = keys; this.audio.setKeys(keys); }
+    } catch { /* storage unavailable */ }
     this.hist = [JSON.stringify(this.songSnapshot())];
     // Opt-in two-way link between the studio tempo and the click's base tempo.
     // Declared as two effects so every writer of `tempo` (slider, templates,
@@ -418,16 +423,43 @@ export class WorkbenchStore {
     this.singleTimers.forEach((id) => clearTimeout(id));
   }
 
+  // ---- the keys' sound ----
+  // A preference of the player's rather than part of the song, so it is kept
+  // on its own: loading or importing a session does not change how the piano
+  // sounds, and undo does not step through it.
+  keysSound = $state(DEFAULT_KEYS.id);
+  setKeysSound(id: string): void {
+    if (!KEYS_VOICES.some((v) => v.id === id) || id === this.keysSound) return;
+    this.keysSound = id;
+    this.audio.setKeys(id);
+    try { localStorage.setItem(KEYS_KEY, id); } catch { /* best-effort */ }
+    // Let it be heard: the chord in hand, or the key's own.
+    if (!this.jzPlaying) {
+      const ch = this.activeChord && !isRest(this.activeChord) ? this.activeChord : null;
+      if (ch) this.playChord(ch, 0.03, undefined, 1.8);
+      else this.playMidis([48 + this.tonicPc, 55 + this.tonicPc, 60 + this.tonicPc, 64 + this.tonicPc], 1.8, 0.03);
+    }
+  }
+
+  /**
+   * Start getting the band ready. The instruments are rendered on the device,
+   * a few milliseconds each, in whatever idle time the page has after it
+   * loads — so they are waiting by the time something is played.
+   */
+  warmAudio(): void { this.audio.warm(); }
+
   // ---- audio wrappers (respect the mute toggle) ----
   // `at` pins a sound to an exact time on the audio clock — how the transport
   // keeps the band locked. Omitted, it plays a lead ahead of now (a preview).
-  private playMidis(midis: number[], dur?: number, stagger?: number, at?: number): void {
+  // `inst` is who plays it: the keys unless told otherwise.
+  private playMidis(midis: number[], dur?: number, stagger?: number, at?: number, inst: Instrument = 'keys'): void {
     if (!this.soundOn) return;
-    this.audio.playMidis(midis, dur ?? 1.2, stagger ?? 0, at);
+    this.audio.playMidis(midis, dur ?? 1.2, stagger ?? 0, at, inst);
   }
-  playChord(ch: Chord | null, stagger = 0.018, at?: number): void {
+  /** `dur` is how long the chord is held before the keys are let go. */
+  playChord(ch: Chord | null, stagger = 0.018, at?: number, dur = 1.3): void {
     if (!ch || isRest(ch)) return; // a rest is a slot of silence — nothing to sound
-    this.playMidis(gMidis(ch), 1.3, stagger, at);
+    this.playMidis(gMidis(ch), dur, stagger, at);
   }
 
   /**
@@ -597,7 +629,7 @@ export class WorkbenchStore {
     if (nextKey && !this.jzPlaying) {
       const { ch, next } = this.bassContext();
       if (nextKey === 'ghost') { if (this.soundOn) this.audio.ghost(bassRootMidi(ch.rootPc)); }
-      else this.playMidis([resolveBassStep(nextKey, ch, next, this.tonicPc)], 0.32);
+      else this.playMidis([resolveBassStep(nextKey, ch, next, this.tonicPc)], 0.32, 0, undefined, 'bass');
     }
   }
   clearBassLine(): void {
@@ -651,7 +683,7 @@ export class WorkbenchStore {
       if (!st.d) return;
       const midi = resolveBassStep(st.d, ch, next, this.tonicPc);
       const dur = Math.max(0.16, (st.l ?? 1.6) * stepSec);
-      if (hear) this.playMidis([midi], dur, 0, t);
+      if (hear) this.playMidis([midi], dur, 0, t, 'bass');
       if (send) this.midi.sendPitched('bass', [midi], this.toPerf(t), dur * 1000);
     });
   }
@@ -666,8 +698,10 @@ export class WorkbenchStore {
   // Instrument taps (piano keys, fret cells) always sound the note; in Reading
   // mode with play-it answering they double as the answer input.
   // `midi` is the exact key/fret pitch; without it the note falls in octave 4.
-  selectNote(pc: number, midi: number = 60 + mod12(pc)): void {
-    this.playMidis([midi], 0.9);
+  // `inst` is the instrument that was touched, so a fret sounds like a string
+  // and a key like a key.
+  selectNote(pc: number, midi: number = 60 + mod12(pc), inst: Instrument = 'keys'): void {
+    this.playMidis([midi], 0.9, 0, undefined, inst);
     this.readingTapPc(pc);
   }
 
@@ -918,7 +952,11 @@ export class WorkbenchStore {
     this.activeChord = voiced;
     // A muted chord part still lights the instruments and still moves the
     // progression on — only the sound is skipped.
-    if (this.audible('chords')) this.playChord(voiced, 0.02, at);
+    // The keys hold each chord for its slot and lift as the next one lands,
+    // the way a player comps — not a fixed length that leaves a gap at slow
+    // tempos and a pile-up at fast ones.
+    const slotSec = (this.chordSlot === 'half' ? this.halfBarMs() : this.barMs()) / 1000;
+    if (this.audible('chords')) this.playChord(voiced, 0.02, at, Math.min(4, slotSec * 0.97));
     // Hardware holds the chord for its whole slot rather than the synth's fixed
     // decay: a sampler sustains what you send it, so a 1.3 s note-off would cut
     // a bar-long change short. A hair under the slot keeps the release clear of
@@ -999,6 +1037,11 @@ export class WorkbenchStore {
     this.jzPlaying = this.jzChanges.length > 0;
     this.drPlaying = this.gridHasHits();
     if (!this.jzPlaying && !this.drPlaying) return; // nothing to play yet
+    // Have every sound the loop uses in hand before the clock is read. The
+    // instruments are rendered on the device, normally in idle time after the
+    // page loads; anything not there yet is rendered here, where it costs a
+    // moment before the music starts rather than a late first beat.
+    if (this.soundOn) this.primeBand();
     // Start far enough out that the first slot is scheduled ahead like every
     // other one, rather than racing the clock the moment PLAY is pressed.
     this.trNext = this.audio.now() + 0.08;
@@ -1007,6 +1050,18 @@ export class WorkbenchStore {
     this.midi.transportStart(this.toPerf(this.trNext));
     this.pump();
     this.trLoop = setInterval(this.pump, LOOKAHEAD_MS);
+  }
+  private primeBand(): void {
+    const drums = DRUM_VOICES.filter((v) => this.drGrid[v.id].some((c) => c !== 0)).map((v) => v.id);
+    const notes: Array<[Instrument, number]> = [];
+    this.jzChanges.forEach((ch) => {
+      if (isRest(ch)) return;
+      gMidis(jChVoiced(ch, this.jzVoicing)).forEach((m) => notes.push(['keys', m]));
+      // the line moves between the root and its octave
+      const root = bassRootMidi(ch.rootPc);
+      for (let m = root - 2; m <= root + 13; m += 3) notes.push(['bass', m]);
+    });
+    this.audio.prepare(notes, drums);
   }
   stopTransport(): void {
     if (this.trLoop) { clearInterval(this.trLoop); this.trLoop = null; }
@@ -1091,8 +1146,10 @@ export class WorkbenchStore {
     if (!this.soundOn) return;
     this.singleTimers.forEach((id) => clearTimeout(id));
     this.singleTimers = [];
-    if (d.kind === 'chord') { this.playMidis(d.midis, 1.5, 0.045); return; }
-    d.midis.forEach((m, i) => this.singleTimers.push(setTimeout(() => this.playMidis([m], 0.45), i * 140)));
+    // four strings is a bass diagram, six a guitar's
+    const inst: Instrument = d.labels.length <= 4 ? 'bass' : 'guitar';
+    if (d.kind === 'chord') { this.playMidis(d.midis, 1.5, 0.045, undefined, inst); return; }
+    d.midis.forEach((m, i) => this.singleTimers.push(setTimeout(() => this.playMidis([m], 0.45, 0, undefined, inst), i * 140)));
   }
 
   // ---- drums groovebox ----

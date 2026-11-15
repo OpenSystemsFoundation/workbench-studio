@@ -31,9 +31,10 @@ describe('the kit', () => {
         expect(l.amp).toBeGreaterThan(0);
         expect(l.amp).toBeLessThanOrEqual(1);
         expect(l.at === undefined || l.at >= 0).toBe(true);
-        if (l.kind === 'noise') {
+        if (l.kind === 'noise' || l.kind === 'metal') {
           expect(['lowpass', 'highpass', 'bandpass']).toContain(l.filter);
           expect(l.freq).toBeGreaterThan(20);
+          if (l.kind === 'metal') expect(l.base).toBeGreaterThan(20);
         } else {
           expect(l.f0).toBeGreaterThan(20);
           expect(l.f1).toBeGreaterThan(20);

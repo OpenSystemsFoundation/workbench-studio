@@ -90,6 +90,7 @@
     mq.addEventListener('change', update);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    store.warmAudio();
     return () => {
       mq.removeEventListener('change', update);
       window.removeEventListener('keydown', onKeyDown);

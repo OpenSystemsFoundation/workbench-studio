@@ -3,6 +3,7 @@
   import GenrePicker from './GenrePicker.svelte';
   import ChordInspector from './parts/ChordInspector.svelte';
   import type { Chord } from '../engine/constants';
+  import { KEYS_VOICES } from '../synth/keys';
   const store = useStore();
   const v = $derived(store.view);
 
@@ -164,6 +165,14 @@
       <div style="display:flex;gap:3px;background:#ece0c6;border:1px solid #cbb792;border-radius:7px;padding:2px">
         <div class="mono click" style="font-size:9px;padding:6px 11px;border-radius:5px;background:{v.vFullBg};color:{v.vFullFg}" role="button" tabindex="0" onclick={() => store.setVoicing('full')} onkeydown={(e) => e.key === 'Enter' && store.setVoicing('full')}>FULL</div>
         <div class="mono click" style="font-size:9px;padding:6px 11px;border-radius:5px;background:{v.vShellBg};color:{v.vShellFg}" role="button" tabindex="0" onclick={() => store.setVoicing('shell')} onkeydown={(e) => e.key === 'Enter' && store.setVoicing('shell')}>SHELL</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px" data-testid="keys-sound">
+      <span class="mono" style="font-size:9px;letter-spacing:.1em;color:#8a7350" title="The electric piano the chords are played on.">KEYS</span>
+      <div style="display:flex;gap:3px;background:#ece0c6;border:1px solid #cbb792;border-radius:7px;padding:2px">
+        {#each KEYS_VOICES as k (k.id)}
+          <div class="mono click" data-testid="keys-{k.id}" title={k.hint} style="font-size:9px;padding:6px 11px;border-radius:5px;background:{store.keysSound === k.id ? '#3f6b5f' : '#f6efe0'};color:{store.keysSound === k.id ? '#fff' : '#5c4a30'}" role="button" tabindex="0" aria-pressed={store.keysSound === k.id} onclick={() => store.setKeysSound(k.id)} onkeydown={(e) => e.key === 'Enter' && store.setKeysSound(k.id)}>{k.name.toUpperCase()}</div>
+        {/each}
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:7px">

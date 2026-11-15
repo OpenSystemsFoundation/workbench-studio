@@ -43,13 +43,51 @@ test.describe('drone: following the Chords progression', () => {
       (window as unknown as { __ev: typeof ev }).__ev = ev;
       const wall = (c: BaseAudioContext, t: number) => performance.now() / 1000 + (t - c.currentTime);
       const freqs = new WeakSet<AudioParam>();
+      // The drone's oscillators are registered here so their glides can be
+      // told apart from every other parameter change.
       const start = OscillatorNode.prototype.start;
       OscillatorNode.prototype.start = function (this: OscillatorNode, when?: number) {
         freqs.add(this.frequency);
-        // only the voices started once the progression plays: the drone's own
-        // oscillators started earlier and glide rather than restart
-        if (armed) ev.push({ kind: 'start', v: this.frequency.value, wall: wall(this.context, when ?? this.context.currentTime) });
         return start.call(this, when as number);
+      };
+      // The studio's band plays rendered buffers, which carry no frequency to
+      // read — so measure one: the pitch of the buffer itself (autocorrelation),
+      // times the rate it is played at. Drum hits are short and are skipped.
+      const pitches = new WeakMap<AudioBuffer, number>();
+      const pitchOf = (buf: AudioBuffer): number => {
+        const known = pitches.get(buf);
+        if (known !== undefined) return known;
+        const d = buf.getChannelData(0);
+        const sr = buf.sampleRate;
+        const off = Math.floor(0.1 * sr);
+        const n = 4096;
+        let best = 0;
+        const r: number[] = [];
+        const lo = Math.floor(sr / 1200);
+        const hi = Math.floor(sr / 28);
+        for (let lag = lo; lag <= hi; lag++) {
+          let acc = 0;
+          for (let i = 0; i < n; i++) acc += d[off + i] * d[off + i + lag];
+          r[lag] = acc;
+          if (acc > best) best = acc;
+        }
+        // the shortest period that correlates nearly as well as the best one
+        let lag = lo + 1;
+        while (lag < hi && !(r[lag] > best * 0.85 && r[lag] >= r[lag - 1] && r[lag] >= r[lag + 1])) lag++;
+        // refine between samples: a parabola through the peak and its neighbours
+        const a = r[lag - 1], b = r[lag], c = r[lag + 1];
+        const fine = lag + (a - c) / (2 * (a - 2 * b + c) || 1);
+        const f = sr / fine;
+        pitches.set(buf, f);
+        return f;
+      };
+      const startBuf = AudioBufferSourceNode.prototype.start;
+      AudioBufferSourceNode.prototype.start = function (this: AudioBufferSourceNode, when?: number, ...rest: number[]) {
+        // only the voices started once the progression plays
+        if (armed && this.buffer && this.buffer.duration > 1.19) {
+          ev.push({ kind: 'start', v: pitchOf(this.buffer) * this.playbackRate.value, wall: wall(this.context, when ?? this.context.currentTime) });
+        }
+        return startBuf.call(this, when as number, ...rest);
       };
       const setTarget = AudioParam.prototype.setTargetAtTime;
       AudioParam.prototype.setTargetAtTime = function (this: AudioParam, v: number, t: number, c: number) {
@@ -86,9 +124,9 @@ test.describe('drone: following the Chords progression', () => {
       const w = window as unknown as { __ev: Array<{ kind: string; v: number; wall: number }> };
       const g3 = 196;
       const drone = w.__ev.filter((e) => e.kind === 'glide' && Math.abs(e.v - g3) < 0.05).map((e) => e.wall);
-      // the studio's G7: its oscillators start at G (any octave)
+      // the studio's G7: notes that sound a G (any octave), to within a fifth of a semitone
       const chord = w.__ev
-        .filter((e) => e.kind === 'start' && [49, 98, 196, 392].some((f) => Math.abs(e.v - f) < 0.6))
+        .filter((e) => e.kind === 'start' && Math.abs(((12 * Math.log2(e.v / g3)) % 12 + 18) % 12 - 6) < 0.2)
         .map((e) => e.wall);
       return { drone, chord };
     });

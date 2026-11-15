@@ -11,11 +11,17 @@ test('first chord press plays only the chord, not the queued ear-training exerci
   await page.addInitScript(() => {
     const rec: Array<{ at: number }> = [];
     (window as unknown as { __osc: typeof rec }).__osc = rec;
-    const start = OscillatorNode.prototype.start;
-    OscillatorNode.prototype.start = function (this: OscillatorNode, when?: number) {
-      try { rec.push({ at: this.context.currentTime }); } catch { /* noop */ }
-      return start.call(this, when as number);
+    // Every kind of source the app can start: the band plays rendered buffers,
+    // the click and the drone play oscillators.
+    const patch = (proto: { start: (when?: number) => void }) => {
+      const start = proto.start;
+      proto.start = function (this: AudioScheduledSourceNode, when?: number) {
+        try { rec.push({ at: this.context.currentTime }); } catch { /* noop */ }
+        return start.call(this, when as number);
+      };
     };
+    patch(OscillatorNode.prototype);
+    patch(AudioBufferSourceNode.prototype);
   });
 
   await page.goto('/');
@@ -29,7 +35,7 @@ test('first chord press plays only the chord, not the queued ear-training exerci
   const osc = await page.evaluate(() => (window as unknown as { __osc: Array<{ at: number }> }).__osc);
   expect(osc.length).toBeGreaterThan(0);
 
-  // Every oscillator should have been scheduled in a single burst (the chord's
+  // Every source should have been scheduled in a single burst (the chord's
   // strum). A second burst hundreds of ms later would be the ear-training note.
   const first = osc[0].at;
   const stray = osc.filter((o) => Math.abs(o.at - first) > 0.05);
