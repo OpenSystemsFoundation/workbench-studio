@@ -66,6 +66,31 @@ test.describe('the sound engine', () => {
     expect(m.tail, 'reverb tail').toBeLessThan(0.05);
   });
 
+  // The presets are trimmed to the same loudness, and that trim travels with
+  // each note. It used to sit on the keys' bus, so changing preset while a
+  // chord rang re-trimmed the notes already sounding: a quiet-trimmed preset's
+  // chord leapt up by the difference until it died away.
+  test('changing the keys preset does not change the level of notes already ringing', async ({ page }) => {
+    await page.goto('/');
+    const m = await page.evaluate(`(async () => {
+      const SR = 48000;
+      const off = new OfflineAudioContext(2, SR * 2, SR);
+      const { AudioEngine } = await import('/src/lib/audio.ts');
+      const eng = new AudioEngine(off);
+      eng.setKeys('suitcase');
+      eng.playMidis([48, 55, 60, 64], 1.9, 0, 0.05, 'keys');
+      off.suspend(1).then(() => { eng.setKeys('stage'); off.resume(); });
+      const buf = await off.startRendering();
+      const L = buf.getChannelData(0), R = buf.getChannelData(1);
+      const rms = (a, b) => { let e = 0; for (let i = Math.floor(a * SR); i < Math.floor(b * SR); i++) e += L[i] * L[i] + R[i] * R[i]; return Math.sqrt(e / ((b - a) * SR)); };
+      return { before: rms(0.6, 1), after: rms(1.05, 1.45) };
+    })()`) as { before: number; after: number };
+    expect(m.before, 'the chord is sounding').toBeGreaterThan(0.01);
+    expect(m.after / m.before, 'level across the change').toBeLessThan(1.15);
+    // it does fall a little: the chord is decaying, and the stage preset has no chorus
+    expect(m.after / m.before, 'level across the change').toBeGreaterThan(0.4);
+  });
+
   // Each part used to guard its own output and connect to the speakers on its
   // own, so nothing watched the sum. Now there is one node allowed to reach
   // the destination, and the band, the click and the drone all pass through it.
