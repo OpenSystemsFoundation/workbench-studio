@@ -1,4 +1,4 @@
-// Patterns-mode view: category tabs, the pattern library chips, chord-shape
+// Pattern-library view: the pattern chips of the group on screen, chord-shape
 // polygons on the circle of fifths, and the fret-diagram tabs.
 import { INT, SUF, CIRCLE, QLABEL, type Chord } from '../engine/constants';
 import { mod12, spell } from '../engine/theory';
@@ -14,8 +14,7 @@ export function buildPatterns(s: WorkbenchStore, activePat: LitInfo['activePat']
   const patFretTab = FRET_TABS.includes(patCat);
   const patLibTab = PAT_GROUPS.includes(patCat);
   const patFret = patFretTab ? fretTab(patCat, t, s.scale) : { intro: '', cards: [] };
-  const patCatChips = PAT_TABS.map((g) => ({ name: g, border: g === patCat ? '#3f6b5f' : '#cbb792', bg: g === patCat ? '#3f6b5f' : '#f6efe0', fg: g === patCat ? '#fff' : '#5c4a30' }));
-  const patChips = patternDefs().filter((p) => p.group === patCat).map((p) => ({ id: p.id, name: p.name, weight: p.id === activePat.id ? '700' : '500', border: p.id === activePat.id ? '#c2562e' : '#cbb792', bg: p.id === activePat.id ? '#fbeede' : '#f6efe0' }));
+  const patChips = patternDefs().filter((p) => p.group === patCat).map((p) => ({ id: p.id, name: p.name, on: p.id === activePat.id }));
   const patInt = activePat.int || activePat.scaleInt || [];
   const patChordName = spell(t, t, s.scale) + SUF[activePat.chord];
   const patDegrees = (activePat.deg || []).map((d, i) => ({ d, color: i === 0 ? '#fff' : '#2c261d', bg: i === 0 ? '#c2562e' : '#efe2c8', bd: i === 0 ? '#c2562e' : '#cbb792' }));
@@ -47,7 +46,7 @@ export function buildPatterns(s: WorkbenchStore, activePat: LitInfo['activePat']
   return {
     patLibTab, patNotes,
     view: {
-      patCatChips, patChips, patName: activePat.name, patTip: activePat.tip, patChordName, activePat,
+      patChips, patName: activePat.name, patTip: activePat.tip, patChordName, activePat,
       patDegrees, patSeqNotes, patHasSeq: !!activePat.seq, patShapes, patShapesTab,
       patFretTab, patFretIntro: patFret.intro, patFretCards: patFret.cards,
     },

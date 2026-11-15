@@ -1,12 +1,13 @@
 <script lang="ts">
   // Ctrl/Cmd+K: jump to anything. One flat, filterable list of tabs, keys,
-  // scales, whole-genre styles and transport actions, so a keyboard user never
+  // scales, whole-genre styles, Learn pages and transport actions, so a keyboard user never
   // has to leave the home row for the mouse. `?` opens the same overlay as a
   // cheat sheet of every shortcut.
   import { useStore } from '../context';
   import { GENRES } from '../engine/genres';
   import { clearSession } from '../session';
   import type { Mode } from '../store.svelte';
+  import { libraryPages, pathTo } from '../learn/catalog';
 
   let { mode, onClose, onToggleSide }: {
     mode: 'palette' | 'help';
@@ -54,6 +55,8 @@
     ...v.keyChips.map((k) => ({ label: 'Key: ' + k.label, group: 'Key', run: () => store.setTonicKey(k.pc) })),
     ...[...v.scalePrimary, ...v.scaleModes].map((m) => ({ label: 'Scale: ' + m.name, group: 'Scale', run: () => store.setScale(m.id) })),
     ...GENRES.map((g) => ({ label: 'Load style: ' + g.name, group: 'Style', hint: g.family, run: () => store.setStyle(g.id) })),
+    // Every page of the Learn library, straight from its catalogue.
+    ...libraryPages().map((n) => ({ label: 'Learn: ' + n.title, group: 'Learn', hint: pathTo(n.id).at(-2)?.title, run: () => store.openLearn(n.id) })),
   ]);
 
   let query = $state('');

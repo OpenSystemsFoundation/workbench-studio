@@ -31,15 +31,27 @@ import { guideForChord, type DroneGuide } from './metronome/drone/guide';
 import { analyseChanges } from './engine/keycenters';
 import { MidiStore } from './midi/store.svelte';
 import { computeView } from './view';
+import { findNode, patternCategory, type LibraryNode, type LibraryPage } from './learn/catalog';
 import type { Wedge } from './view/types';
+
+// Where the reader left off in the Learn library. A per-viewer convenience, not
+// part of the song, so it has its own key and storage failures are ignored.
+const LEARN_KEY = 'wb.learnPage';
+function readLearnPage(): string {
+  try {
+    const id = typeof localStorage !== 'undefined' ? localStorage.getItem(LEARN_KEY) : null;
+    return id && findNode(id) ? id : '';
+  } catch { return ''; }
+}
+function writeLearnPage(id: string): void {
+  try { if (typeof localStorage !== 'undefined') localStorage.setItem(LEARN_KEY, id); } catch { /* private mode */ }
+}
 
 // The six studio tabs. Circle explores, Drums / Chords / Bass build over one
 // shared transport, Metronome practises, and Learn teaches — every piece of
 // theory copy and every teaching palette lives behind that last tab.
 export type Mode = 'circle' | 'drums' | 'chords' | 'bass' | 'metronome' | 'learn';
-export type LearnTab = 'theory' | 'rhythm' | 'bass' | 'patterns' | 'practice' | 'forms';
 /** The two drills inside Learn → Practice. */
-export type PracticeDrill = 'ear' | 'reading';
 /** The three parts of the band, each with its own tab and its own mixer strip. */
 export type Part = 'drums' | 'chords' | 'bass';
 /** How long one chord of the progression holds: half a bar (2 beats) or a full bar. */
@@ -154,9 +166,7 @@ export class WorkbenchStore {
   // pattern of mutes, so leaving solo restores exactly what you had muted.
   partOn = $state<Record<Part, boolean>>({ drums: true, chords: true, bass: true });
   soloPart = $state<Part | null>(null);
-  patCat = $state('Scales');
   patId = $state('major');
-  jazzCh = $state(0);
 
   // How long each change holds. This is a setting of its own, not a side effect
   // of the style: BASS used to silently give every chord a full bar, which read
@@ -194,8 +204,13 @@ export class WorkbenchStore {
   drStep = $state(-1);
   drSwing = $state(50);
 
-  learnTab = $state<LearnTab>('theory');
-  practiceDrill = $state<PracticeDrill>('ear');
+  // Where you are in the Learn library: the id of a catalogue node (see
+  // learn/catalog.ts). '' is the front desk, a shelf or book id is its index,
+  // a page id is a lesson. This one id replaces what used to be four separate
+  // fields — the subtab, the drill, the jazz chapter and the pattern category
+  // — which is what lets one tree, one breadcrumb and one pager navigate all
+  // of it.
+  learnPage = $state(readLearnPage());
 
   dockOpen = $state(false);
   circleView = $state<'maj' | 'min'>('maj');
@@ -261,15 +276,32 @@ export class WorkbenchStore {
    * readable instead of repeating a three-term conditional.
    */
   get readingOpen(): boolean {
-    return this.mode === 'learn' && this.learnTab === 'practice' && this.practiceDrill === 'reading';
+    return this.mode === 'learn' && this.learnLesson?.kind === 'reading';
   }
-  /** Likewise for the ear drill, which owns the Practice tab's other half. */
+  /** Likewise for the ear drill, the Practice shelf's other page. */
   get earOpen(): boolean {
-    return this.mode === 'learn' && this.learnTab === 'practice' && this.practiceDrill === 'ear';
+    return this.mode === 'learn' && this.learnLesson?.kind === 'ear';
   }
-  /** The pattern library, which lights the scale on the instruments. */
+  /** A pattern-library page, which lights the scale on the instruments. */
   get patternsOpen(): boolean {
-    return this.mode === 'learn' && this.learnTab === 'patterns';
+    return this.mode === 'learn' && patternCategory(this.learnLesson) !== null;
+  }
+  /** The catalogue node on screen in Learn; the front desk if the id is stale. */
+  get learnNode(): LibraryNode {
+    return findNode(this.learnPage) ?? findNode('')!;
+  }
+  /** The lesson on screen, or undefined on the front desk and index pages. */
+  get learnLesson(): LibraryPage | undefined {
+    return this.learnNode.page;
+  }
+  /** The pattern-library category on screen; Scales when Learn is elsewhere. */
+  get patCat(): string {
+    return patternCategory(this.learnLesson) ?? 'Scales';
+  }
+  /** The jazz chapter on screen; the first when Learn is elsewhere. */
+  get jazzCh(): number {
+    const l = this.learnLesson;
+    return l?.kind === 'jazz' ? l.chapter : 0;
   }
 
   // ---- non-reactive ----
@@ -688,13 +720,7 @@ export class WorkbenchStore {
     });
   }
   setVoicing(v: 'full' | 'shell'): void { this.jzVoicing = v; }
-  setPatCat(g: string): void {
-    const first = patternDefs().find((p) => p.group === g);
-    this.patCat = g;
-    if (first) this.patId = first.id;
-  }
   setPatId(id: string): void { this.patId = id; }
-  setJazzCh(i: number): void { this.jazzCh = i; }
   // Instrument taps (piano keys, fret cells) always sound the note; in Reading
   // mode with play-it answering they double as the answer input.
   // `midi` is the exact key/fret pitch; without it the note falls in octave 4.
@@ -1294,21 +1320,34 @@ export class WorkbenchStore {
   stopDrums(): void { this.stopTransport(); }
 
   // ---- learn: rhythm theory ----
-  setLearnTab(t: LearnTab): void { this.learnTab = t; }
   /**
-   * The `?` on a tool surface: jump to the Learn area that explains it. This is
+   * Go to a node of the Learn library: a page, a book, a shelf, or '' for the
+   * front desk. Unknown ids land on the front desk rather than a blank page.
+   */
+  setLearnPage(id: string): void {
+    const node = findNode(id) ?? findNode('')!;
+    if (node.id === this.learnPage) return;
+    this.learnPage = node.id;
+    writeLearnPage(node.id);
+    const lesson = node.page;
+    // A pattern group opens on its first pattern, so the instruments light up
+    // with something from the page you are actually on.
+    if (lesson?.kind === 'patterns') {
+      const first = patternDefs().find((p) => p.group === lesson.group);
+      if (first) this.patId = first.id;
+    }
+    // Reading clears the lighting so the staff can't be answered by looking at
+    // the fretboards; a fresh target on the way in does that.
+    if (lesson?.kind === 'reading') this.genReading();
+  }
+  /**
+   * The `?` on a tool surface: jump to the Learn page that explains it. This is
    * the connective tissue for moving the prose out of the tool tabs — the copy
    * is one tap away rather than permanently in the way.
    */
-  openLearn(t: LearnTab): void {
-    this.learnTab = t;
+  openLearn(id: string): void {
     this.mode = 'learn';
-  }
-  setPracticeDrill(d: PracticeDrill): void {
-    this.practiceDrill = d;
-    // Reading clears the lighting so the staff can't be answered by looking at
-    // the fretboards; leaving the drill should not leave them dark.
-    if (d === 'reading') this.genReading();
+    this.setLearnPage(id);
   }
   /** Play a rhythm concept's one-bar demo at its own tempo and feel. */
   playRhythmDemo(id: string): void {

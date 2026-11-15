@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openLearnPage } from './learn';
 
 test.use({ viewport: { width: 1280, height: 900 } });
 
@@ -45,11 +46,11 @@ test.describe('drums groovebox', () => {
     await expect(layers.getByText(/Bomb drops/)).toBeVisible();
   });
 
-  // The programming note is explanation, so it reads in Learn → Rhythm now —
-  // but it still describes whichever genre the groovebox has loaded.
+  // The programming note is explanation, so it reads in Learn → Rhythm → Your
+  // groove now — but it still describes whichever genre the groovebox has loaded.
   test('every genre carries its own programming note, over in Learn', async ({ page }) => {
     await page.getByTestId('desktop-tabs').getByRole('tab', { name: 'learn' }).click();
-    await page.getByTestId('learn-tabs').getByRole('tab', { name: 'rhythm' }).click();
+    await openLearnPage(page, 'Your groove, layer by layer');
     await expect(page.getByTestId('drum-maschine')).toContainText(/velocity|swing|pads?/i);
 
     await page.getByTestId('desktop-tabs').getByRole('tab', { name: 'drums' }).click();
@@ -145,28 +146,29 @@ test.describe('learn: rhythm & drums tab', () => {
   test('shows the rhythm theory concepts alongside the harmony curriculum', async ({ page }) => {
     await page.goto('/');
     await page.getByTestId('desktop-tabs').getByRole('tab', { name: 'learn' }).click();
-    // harmony curriculum is the default
-    await expect(page.getByText('Eight building blocks of jazz & groove harmony')).toBeVisible();
-    await page.getByTestId('learn-tabs').getByRole('tab', { name: 'rhythm' }).click();
+    // the library's front desk is the default, with the harmony book on it
+    await expect(page.getByText('Eight building blocks, from extensions to the ii–V–I and beyond.')).toBeVisible();
+    await openLearnPage(page, 'The building blocks');
     await expect(page.getByText('The Backbeat', { exact: true })).toBeVisible();
     await expect(page.getByText('The Clave — a Timeline', { exact: true })).toBeVisible();
     await expect(page.getByText('Swing & Shuffle', { exact: true })).toBeVisible();
-    // the anatomy of the loaded groove moved here with the rest of the prose
+    // the anatomy of the loaded groove is the next page on the same shelf
+    await page.getByTestId('learn-pager').getByRole('button', { name: /Your groove, layer by layer/ }).click();
     await page.getByTestId('learn-drum-layers').getByText(/Kick on 1 & 3/).click();
     await expect(page.getByText(/lays the foundation on the strong beats/)).toBeVisible();
     await page.getByTestId('learn-drum-layers').getByText(/Backbeat snare/).click();
     await expect(page.getByText(/where an audience claps/)).toBeVisible();
-    // bassline tricks live in their own tab
-    await page.getByTestId('learn-tabs').getByRole('tab', { name: 'bass' }).click();
-    await expect(page.getByText('Tricks of the trade')).toBeVisible();
+    // bassline tricks live on their own shelf
+    await openLearnPage(page, 'Tricks of the trade');
+    await expect(page.getByRole('heading', { name: 'Tricks of the trade' })).toBeVisible();
     await expect(page.getByText('BASSLINE MOVES', { exact: true })).toBeVisible();
-    // song structures tab peaks in the long-form fusion card
-    await page.getByTestId('learn-tabs').getByRole('tab', { name: 'forms' }).click();
+    // the song structures page peaks in the long-form fusion card
+    await openLearnPage(page, 'Song structures');
     await expect(page.getByText('The Long Form · Bitches Brew')).toBeVisible();
     await expect(page.getByText('Verse–Chorus', { exact: true })).toBeVisible();
     // and back
-    await page.getByTestId('learn-tabs').getByRole('tab', { name: 'theory' }).click();
-    await expect(page.getByText('Eight building blocks of jazz & groove harmony')).toBeVisible();
-    await expect(page.getByText('Tricks of the trade')).toBeHidden();
+    await openLearnPage(page, 'Jazz & groove harmony', 'Extensions');
+    await expect(page.getByText('Building up the I chord')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Tricks of the trade' })).toBeHidden();
   });
 });

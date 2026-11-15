@@ -119,7 +119,7 @@
           <div class="mono click" style="font-size:10px;letter-spacing:.04em;padding:8px 12px;border-radius:6px;border:1px solid {l.border};background:{l.bg};color:{l.fg};white-space:nowrap" role="button" tabindex="0" onclick={() => store.setDrLayers(l.i + 1)} onkeydown={(e) => e.key === 'Enter' && store.setDrLayers(l.i + 1)}>{l.i + 1} · {l.name}</div>
         {/each}
       </div>
-      <div class="mono click" style="flex:none;font-size:9px;letter-spacing:.06em;padding:6px 11px;border-radius:6px;border:1px solid #cbb792;color:#7a6b50" role="button" tabindex="0" aria-label="how this groove is built" onclick={() => store.openLearn('rhythm')} onkeydown={(e) => e.key === 'Enter' && store.openLearn('rhythm')}>? HOW IT'S BUILT</div>
+      <div class="mono click" style="flex:none;font-size:9px;letter-spacing:.06em;padding:6px 11px;border-radius:6px;border:1px solid #cbb792;color:#7a6b50" role="button" tabindex="0" aria-label="how this groove is built" onclick={() => store.openLearn('rhythm/your-groove')} onkeydown={(e) => e.key === 'Enter' && store.openLearn('rhythm/your-groove')}>? HOW IT'S BUILT</div>
     </div>
   </div>
 </div>
