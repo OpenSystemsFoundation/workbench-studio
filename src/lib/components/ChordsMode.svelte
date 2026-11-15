@@ -1,5 +1,6 @@
 <script lang="ts">
   import { useStore } from '../context';
+  import Switch from './ui/Switch.svelte';
   import GenrePicker from './GenrePicker.svelte';
   import ChordInspector from './parts/ChordInspector.svelte';
   import type { Chord } from '../engine/constants';
@@ -90,7 +91,14 @@
        from the current key, which is exactly the wrong palette for a standard —
        so this takes any chord, in any spelling, and works out the key from what
        you enter rather than making you set it first. -->
-  <div class="eyebrow" style="margin-bottom:7px">Enter changes · type them as the page writes them</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:{store.typeEntry ? 10 : 16}px">
+    <div>
+      <div class="eyebrow" style="margin-bottom:3px">Type changes</div>
+      <div class="caption" style="font-size:12px">Enter a chart as the page writes it, instead of building it chord by chord.</div>
+    </div>
+    <Switch checked={store.typeEntry} label="Type chord changes" onchange={(on) => store.setTypeEntry(on)} />
+  </div>
+  {#if store.typeEntry}
   <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
     <input
       class="mono"
@@ -110,6 +118,7 @@
       Any spelling works: <b>Em7b5</b>, <b>Eø7</b> and <b>E-7b5</b> are the same chord. Bar lines optional. Write <b>N.C.</b> for a bar nothing sounds on.
     {/if}
   </div>
+  {/if}
 
   <!-- progression strip -->
   <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:7px;flex-wrap:wrap">
@@ -124,7 +133,7 @@
        same scroll container as its chords so the two cannot drift apart. -->
   <div bind:this={stripEl} style="display:flex;gap:14px;overflow-x:auto;min-height:78px;padding:11px;background:#ece0c6;border:1px dashed #cbb792;border-radius:9px;margin-bottom:12px;align-items:stretch">
     {#if v.jzEmpty}
-      <span class="caption" style="font-size:14px;color:#9a8763;max-width:440px;align-self:center">Empty — type the changes above, load a starting point below, or tap a chord to pre-hear it and its <b>+</b> to place it. Tap a placed chord to edit it, or <b>+ REST</b> for a bar that sounds nothing.</span>
+      <span class="caption" style="font-size:14px;color:#9a8763;max-width:440px;align-self:center">Empty — load a starting point below, or tap a chord to pre-hear it and its <b>+</b> to place it. Tap a placed chord to edit it, or <b>+ REST</b> for a bar that sounds nothing.</span>
       <span class="mono click" data-testid="progression-starter" style="align-self:center;flex:none;font-size:10px;letter-spacing:.06em;color:#fff;background:#3f6b5f;padding:9px 13px;border-radius:6px;white-space:nowrap" role="button" tabindex="0" onclick={() => store.loadStarterProgression()} onkeydown={(e) => e.key === 'Enter' && store.loadStarterProgression()}>▸ START FROM A {v.wsGenreName.toUpperCase()} PROGRESSION</span>
     {/if}
     {#each v.keyGroups as g, gi (gi)}

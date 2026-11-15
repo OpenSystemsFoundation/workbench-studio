@@ -44,6 +44,7 @@ test('the instrument panel folds away and the choice survives a reload', async (
 test('the timeline shows the progression on Drums and jumps the loop on click', async ({ page }) => {
   await page.goto('/');
   await page.keyboard.press('3');
+  await page.getByRole('button', { name: 'Type chord changes' }).click();
   await page.getByLabel('Enter chord changes').fill('Dm7 G7 Cmaj7 A7');
   await page.getByTestId('add-typed').click();
   await page.keyboard.press('2');
