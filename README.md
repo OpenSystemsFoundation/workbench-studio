@@ -116,6 +116,11 @@ model, rendered on the device.
 - **Keys** are an electric piano modelled the way the instrument works — a tine swinging
   past a magnetic pickup. The pickup's field is non-linear, so a note barks at the attack
   and relaxes into a bell-like tone as it decays, with no filter envelope involved.
+  It comes in four presets, picked on the Chords tab and remembered between visits:
+  **Suitcase** (the default — round and lush, with stereo vibrato and chorus), **Stage**
+  (dry, more bark), **Bell** (glassy, wide chorus) and **Reed** (a reed piano, nasal, with
+  its tremolo throb). A preset is the same model with the pickup moved and the effects
+  changed, so adding one is an entry in `KEYS_VOICES` in `synth/keys.ts`.
 - **Bass and guitar** are a plucked string solved as a sum of its modes: where it is
   plucked, where the pickup sits, how stiff it is, and how fast each mode loses energy. A
   note starts bright and mellows as it rings, and is exactly in tune.

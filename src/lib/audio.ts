@@ -3,7 +3,7 @@
 // played through a small mixing desk. Isolated from state so it can be
 // reasoned about (and stubbed in tests).
 //
-//   keys ── spread across the stereo field by pitch ─┐
+//   keys ── spread by pitch ─ chorus ─ tremolo ──────┐
 //   guitar ── just off centre ───────────────────────┼─ band (master volume) ─┐
 //   bass ── dead centre, dry ────────────────────────┘                        │
 //   drums ── each voice at its own place in the kit ──────────────────────────┼─ master bus ─ speakers
@@ -17,10 +17,13 @@ import { drumVoice as drumVoiceDef } from './engine/drums';
 import type { DrumVoiceId } from './engine/drums';
 import { masterBus } from './master';
 import { SampleBank, prewarm, type Instrument } from './synth/bank';
+import { DEFAULT_KEYS, keysVoice, type KeysVoice } from './synth/keys';
 import type { RoomSpec } from './synth/room';
 
 export { softClipCurve } from './master';
 export type { Instrument } from './synth/bank';
+export { KEYS_VOICES, DEFAULT_KEYS } from './synth/keys';
+export type { KeysVoice } from './synth/keys';
 
 // How far ahead of the clock a scheduled event is placed: long enough that a
 // busy main thread can't push a note into the past, short enough not to feel
@@ -37,8 +40,7 @@ const LEVEL: Record<Instrument, number> = { keys: 0.5, bass: 0.26, guitar: 0.38 
 const RELEASE: Record<Instrument, number> = { keys: 0.07, bass: 0.028, guitar: 0.05 };
 /** Where across the stereo field the keyboard's registers sit: low keys left, high keys right. */
 const KEY_PANS = [-0.3, -0.15, 0, 0.15, 0.3];
-/** How much of the keys and the guitar goes to the room. The bass stays dry. */
-const KEYS_ROOM = 0.2;
+/** How much of the guitar goes to the room. The keys' send is part of their preset; the bass stays dry. */
 const GUITAR_ROOM = 0.16;
 const GUITAR_PAN = 0.12;
 /** The room: a small, warm studio — enough to place the band, short enough to stay out of the way. */
@@ -74,6 +76,12 @@ export class AudioEngine {
   private drumBus: GainNode | null = null;
   private room: ConvolverNode | null = null;
   private drumStrips = new Map<DrumVoiceId, GainNode>();
+  private keys: KeysVoice = DEFAULT_KEYS;
+  /** The knobs of the keys' effects, set from the preset. */
+  private keysFx: {
+    room: AudioParam; level: AudioParam; chorus: AudioParam;
+    tremRate: AudioParam; tremPan: AudioParam; tremAmp: AudioParam; tremBase: AudioParam;
+  } | null = null;
   volume = 0.78;
 
   /**
@@ -107,18 +115,64 @@ export class AudioEngine {
       if (this.given) openRoom();
       else requestAnimationFrame(() => setTimeout(openRoom, 0));
 
-      // The keyboard, laid out left to right like the instrument.
+      // The keyboard, laid out left to right like the instrument, then through
+      // the two effects an electric piano is rarely heard without:
+      //
+      //   keys ─┬───────────────────────────┬─ tremolo (level, then pan) ─ trim ─ band
+      //         └─ chorus: two swept delays ┘
+      //
+      // The chorus is a pair of short delays whose length drifts slowly, one
+      // to each side — the same notes a few cents either way, which is where
+      // the width and the shimmer come from. The tremolo is one slow sine,
+      // either dipping the level (a reed piano's throb) or swinging the sound
+      // between the speakers (the "suitcase" vibrato). All of it is native
+      // nodes, running whether or not a note is sounding, and costs nothing to
+      // speak of. A preset is a setting of these knobs — see applyKeys().
       const keysRoom = ctx.createGain();
-      keysRoom.gain.value = KEYS_ROOM;
       keysRoom.connect(this.room);
+      const keysMix = ctx.createGain();
       this.keyBuses = KEY_PANS.map((pan) => {
         const bus = ctx.createGain();
         const p = ctx.createStereoPanner();
         p.pan.value = pan;
-        bus.connect(p).connect(this.band!);
+        bus.connect(p).connect(keysMix);
         bus.connect(keysRoom);
         return bus;
       });
+      const lfo = (hz: number) => {
+        const o = ctx.createOscillator();
+        o.frequency.value = hz;
+        o.start();
+        return o;
+      };
+      const chorus = ctx.createGain();
+      ([[0.0115, 0.53, -0.85], [0.0155, 0.71, 0.85]] as const).forEach(([base, hz, pan]) => {
+        const d = ctx.createDelay(0.05);
+        d.delayTime.value = base;
+        const sweep = ctx.createGain();
+        sweep.gain.value = 0.0028;
+        lfo(hz).connect(sweep).connect(d.delayTime);
+        const p = ctx.createStereoPanner();
+        p.pan.value = pan;
+        keysMix.connect(d).connect(p).connect(chorus);
+      });
+      const tremLevel = ctx.createGain();
+      const tremPan = ctx.createStereoPanner();
+      const trim = ctx.createGain();
+      keysMix.connect(tremLevel);
+      chorus.connect(tremLevel);
+      tremLevel.connect(tremPan).connect(trim).connect(this.band);
+      const trem = lfo(4.3);
+      const toLevel = ctx.createGain();
+      const toPan = ctx.createGain();
+      trem.connect(toLevel).connect(tremLevel.gain);
+      trem.connect(toPan).connect(tremPan.pan);
+      this.keysFx = {
+        room: keysRoom.gain, level: trim.gain, chorus: chorus.gain,
+        tremRate: trem.frequency, tremPan: toPan.gain, tremAmp: toLevel.gain, tremBase: tremLevel.gain,
+      };
+      this.bank.setKeys(this.keys);
+      this.applyKeys(true);
 
       this.bassBus = ctx.createGain();
       this.bassBus.connect(this.band);
@@ -140,7 +194,7 @@ export class AudioEngine {
       // no-op when the guess made at load was right. An offline render has no
       // idle time to do it in, and takes each sound as it is asked for.
       if (!this.given) {
-        prewarm(ctx.sampleRate, ROOM);
+        prewarm(ctx.sampleRate, ROOM, this.keys);
         rememberRate(ctx.sampleRate);
       }
     }
@@ -406,13 +460,52 @@ export class AudioEngine {
     this.run(() => this.drumVoice(v, this.actx!.currentTime + 0.02, vel));
   }
 
+  /** Set the keys' effects to the current preset — at once, or eased over a moment. */
+  private applyKeys(immediate = false): void {
+    const fx = this.keysFx;
+    if (!fx || !this.actx) return;
+    const f = this.keys.fx;
+    const t = this.actx.currentTime;
+    const set = (p: AudioParam, v: number) => {
+      if (immediate) p.value = v;
+      else p.setTargetAtTime(v, t, 0.03);
+    };
+    set(fx.room, f.room);
+    set(fx.level, f.level);
+    set(fx.chorus, f.chorus);
+    set(fx.tremRate, f.tremRate);
+    set(fx.tremPan, f.tremPan);
+    // the level tremolo dips below full rather than swinging above it
+    set(fx.tremAmp, f.tremAmp / 2);
+    set(fx.tremBase, 1 - f.tremAmp / 2);
+  }
+
+  /** The keys preset in use. */
+  get keysId(): string {
+    return this.keys.id;
+  }
+
+  /**
+   * Choose the keys preset (see KEYS_VOICES). Its notes are rendered in idle
+   * time like the rest of the band; one played before then is rendered on the
+   * spot. Safe to call before anything has sounded.
+   */
+  setKeys(id: string): void {
+    const voice = keysVoice(id);
+    if (voice.id === this.keys.id) return;
+    this.keys = voice;
+    this.bank?.setKeys(voice);
+    this.applyKeys();
+    prewarm(this.actx?.sampleRate ?? likelyRate(), ROOM, voice);
+  }
+
   /**
    * Start rendering the instruments in idle time. Safe to call at page load:
    * it makes no sound and creates no AudioContext, so no autoplay policy is
    * involved — it only means the band is ready before the first tap.
    */
   warm(): void {
-    prewarm(this.actx?.sampleRate ?? likelyRate(), ROOM);
+    prewarm(this.actx?.sampleRate ?? likelyRate(), ROOM, this.keys);
   }
 
   /**

@@ -25,7 +25,7 @@ import {
   drumTemplates, composeGrid, swingDelaySteps, templateVoices, inKitOrder,
   type DrumVoiceId, type DrumGrid, type DrumLayerPart,
 } from './engine/drums';
-import { AudioEngine, type Instrument } from './audio';
+import { AudioEngine, DEFAULT_KEYS, KEYS_VOICES, type Instrument } from './audio';
 import { MetronomeStore } from './metronome/store.svelte';
 import { guideForChord, type DroneGuide } from './metronome/drone/guide';
 import { analyseChanges } from './engine/keycenters';
@@ -51,6 +51,7 @@ export type ChordSlot = 'half' | 'bar';
 // at an exact time on the audio clock, accumulated from the slot before it.
 // A late or jittery wake-up then changes when we *schedule*, never when
 // anything *sounds*.
+const KEYS_KEY = 'workbench.keys';
 const LOOKAHEAD_MS = 25;
 const SCHEDULE_AHEAD_S = 0.12;
 
@@ -368,6 +369,10 @@ export class WorkbenchStore {
     // exactly that state.
     const saved = loadSession();
     if (saved) this.restoreSession(saved);
+    try {
+      const keys = typeof localStorage !== 'undefined' ? localStorage.getItem(KEYS_KEY) : null;
+      if (keys && KEYS_VOICES.some((v) => v.id === keys)) { this.keysSound = keys; this.audio.setKeys(keys); }
+    } catch { /* storage unavailable */ }
     this.hist = [JSON.stringify(this.songSnapshot())];
     // Opt-in two-way link between the studio tempo and the click's base tempo.
     // Declared as two effects so every writer of `tempo` (slider, templates,
@@ -416,6 +421,24 @@ export class WorkbenchStore {
     this.stopDraw();
     this.seqTimers.forEach((id) => clearTimeout(id));
     this.singleTimers.forEach((id) => clearTimeout(id));
+  }
+
+  // ---- the keys' sound ----
+  // A preference of the player's rather than part of the song, so it is kept
+  // on its own: loading or importing a session does not change how the piano
+  // sounds, and undo does not step through it.
+  keysSound = $state(DEFAULT_KEYS.id);
+  setKeysSound(id: string): void {
+    if (!KEYS_VOICES.some((v) => v.id === id) || id === this.keysSound) return;
+    this.keysSound = id;
+    this.audio.setKeys(id);
+    try { localStorage.setItem(KEYS_KEY, id); } catch { /* best-effort */ }
+    // Let it be heard: the chord in hand, or the key's own.
+    if (!this.jzPlaying) {
+      const ch = this.activeChord && !isRest(this.activeChord) ? this.activeChord : null;
+      if (ch) this.playChord(ch, 0.03, undefined, 1.8);
+      else this.playMidis([48 + this.tonicPc, 55 + this.tonicPc, 60 + this.tonicPc, 64 + this.tonicPc], 1.8, 0.03);
+    }
   }
 
   /**

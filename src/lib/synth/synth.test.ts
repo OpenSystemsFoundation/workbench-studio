@@ -3,6 +3,7 @@ import { DRUM_VOICES } from '../engine/kit';
 import { inRange, renderNote, zoneRoot, type Instrument } from './bank';
 import { addPartial, midiToHz, peak } from './dsp';
 import { drumSeconds, drumVaries, renderDrum } from './drumkit';
+import { KEYS_VOICES, DEFAULT_KEYS, keysVoice, renderKeys } from './keys';
 import { roomImpulse } from './room';
 import { BASS, GUITAR, fretOf } from './strings';
 
@@ -132,6 +133,52 @@ describe('the pitched instruments', () => {
       }
       expect(Math.abs(at), `${rate} Hz`).toBeLessThanOrEqual(2);
     }
+  });
+});
+
+describe('the keys presets', () => {
+  it('offers a few, each with a name and a hint, the lush one first', () => {
+    expect(KEYS_VOICES.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(KEYS_VOICES.map((v) => v.id)).size).toBe(KEYS_VOICES.length);
+    KEYS_VOICES.forEach((v) => {
+      expect(v.name).toBeTruthy();
+      expect(v.hint.length).toBeGreaterThan(10);
+      expect(v.fx.level).toBeGreaterThan(0);
+      expect(v.fx.tremPan + v.fx.tremAmp).toBeLessThanOrEqual(1);
+    });
+    expect(DEFAULT_KEYS.id).toBe('suitcase');
+    expect(keysVoice('nonsense')).toBe(DEFAULT_KEYS);
+    expect(keysVoice('stage').id).toBe('stage');
+  });
+
+  for (const voice of KEYS_VOICES) {
+    it(`${voice.id}: in tune, full-scale, finite, starting and ending on silence`, () => {
+      for (const m of [37, 55, 73, 91]) {
+        const d = renderKeys(m, SR, voice);
+        expect(finite(d), `${m} finite`).toBe(true);
+        expect(peak(d), `${m} peak`).toBeCloseTo(1, 5);
+        expect(d[0]).toBe(0);
+        expect(Math.abs(d[d.length - 1]), `${m} last sample`).toBe(0);
+        expect(Math.abs(centsOff(d, midiToHz(m))), `${m} tuning`).toBeLessThanOrEqual(2);
+        expect(rms(d, 1.0, 1.2), `${m} decays`).toBeLessThan(rms(d, 0.05, 0.25));
+      }
+    });
+  }
+
+  it('the presets are different instruments, not one under four names', () => {
+    const notes = KEYS_VOICES.map((v) => renderKeys(60, SR, v));
+    for (let a = 0; a < notes.length; a++) {
+      for (let b = a + 1; b < notes.length; b++) expect(same(notes[a], notes[b])).toBe(false);
+    }
+  });
+
+  it('the lush preset rings longer and barks less than the dry one', () => {
+    const lush = renderKeys(48, SR, keysVoice('suitcase'));
+    const dry = renderKeys(48, SR, keysVoice('stage'));
+    expect(rms(lush, 2, 2.4)).toBeGreaterThan(rms(dry, 2, 2.4));
+    const f = midiToHz(48);
+    const bark = (d: Float32Array) => strength(d, f * 5, 0.01, 0.1) / strength(d, f, 0.01, 0.1);
+    expect(bark(lush)).toBeLessThan(bark(dry));
   });
 });
 

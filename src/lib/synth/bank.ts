@@ -24,7 +24,7 @@
 
 import { DRUM_VOICES, drumVoice, type DrumVoiceId } from '../engine/kit';
 import { drumVaries, renderDrum } from './drumkit';
-import { renderKeys } from './keys';
+import { DEFAULT_KEYS, renderKeys, type KeysVoice } from './keys';
 import { roomImpulse, type RoomSpec } from './room';
 import { BASS, GUITAR, renderString } from './strings';
 
@@ -50,8 +50,8 @@ export function inRange(inst: Instrument, midi: number): number {
   return m;
 }
 
-export function renderNote(inst: Instrument, midi: number, sampleRate: number): Float32Array {
-  if (inst === 'keys') return renderKeys(midi, sampleRate);
+export function renderNote(inst: Instrument, midi: number, sampleRate: number, keys: KeysVoice = DEFAULT_KEYS): Float32Array {
+  if (inst === 'keys') return renderKeys(midi, sampleRate, keys);
   return renderString(inst === 'bass' ? BASS : GUITAR, midi, sampleRate);
 }
 
@@ -77,13 +77,16 @@ const standIns = new Map<string, { channels: Float32Array[]; rate: number }>();
 const made = new Set<string>();
 
 // A sound is `name@rate`: the name says what it is, the rate what it was rendered at.
-const noteName = (inst: Instrument, root: number) => `${inst}:${root}`;
+// The keys are named by their preset as well: each one is a different set of notes.
+const noteName = (inst: Instrument, root: number, keys: KeysVoice) =>
+  inst === 'keys' ? `keys.${keys.id}:${root}` : `${inst}:${root}`;
 const drumName = (v: DrumVoiceId, strike: number) => `${v}#${strike}`;
 const roomName = (seconds: number) => `room:${seconds}`;
 const at = (name: string, rate: number) => `${name}@${rate}`;
 
 let queue: Array<() => void> = [];
 let warmRate = 0;
+let warmKeys = '';
 let scheduled = false;
 
 function pump(): void {
@@ -110,25 +113,34 @@ function schedule(): void {
  * there is one, a guess; if the guess turns out wrong the work is simply done
  * again at the right rate, as if it had never been started.
  */
-export function prewarm(sampleRate: number, room?: RoomSpec): void {
-  if (warmRate === sampleRate) return;
-  // What the last guess rendered becomes the stand-ins for this one.
-  for (const [key, channels] of pending) {
-    const [name, rate] = key.split('@');
-    standIns.set(name, { channels, rate: Number(rate) });
+export function prewarm(sampleRate: number, room?: RoomSpec, keys: KeysVoice = DEFAULT_KEYS): void {
+  if (warmRate === sampleRate && warmKeys === keys.id) return;
+  if (warmRate !== sampleRate) {
+    // What the last guess rendered becomes the stand-ins for this one.
+    for (const [key, channels] of pending) {
+      const [name, rate] = key.split('@');
+      standIns.set(name, { channels, rate: Number(rate) });
+    }
+    pending.clear();
   }
-  pending.clear();
+  // Another keys preset is another set of notes: let go of the old one's.
+  for (const map of [pending, standIns]) {
+    for (const key of [...map.keys()]) if (key.startsWith('keys.') && !key.startsWith(`keys.${keys.id}:`)) map.delete(key);
+  }
+  for (const key of [...made]) if (key.startsWith('keys.') && !key.startsWith(`keys.${keys.id}:`)) made.delete(key);
   warmRate = sampleRate;
+  warmKeys = keys.id;
+  const current = () => warmRate === sampleRate && warmKeys === keys.id;
   const later = (name: string, rate: number, render: () => Float32Array[]) => () => {
     const key = at(name, rate);
-    if (warmRate !== sampleRate || made.has(key)) return;
+    if (!current() || made.has(key)) return;
     made.add(key);
     pending.set(key, render());
   };
   const note = (inst: Instrument, midi: number) => {
     const root = zoneRoot(midi);
     const rate = noteRate(inst, sampleRate);
-    return later(noteName(inst, root), rate, () => [renderNote(inst, root, rate)]);
+    return later(noteName(inst, root, keys), rate, () => [renderNote(inst, root, rate, keys)]);
   };
   const drum = (v: DrumVoiceId, strike: number) =>
     later(drumName(v, strike), sampleRate, () => [renderDrum(drumVoice(v).synth, sampleRate, strike + 1)]);
@@ -153,6 +165,16 @@ export class SampleBank {
   private borrowed = new Map<string, AudioBuffer>();
   private lastStrike = new Map<DrumVoiceId, number>();
   private ctx: BaseAudioContext;
+  private keys: KeysVoice = DEFAULT_KEYS;
+
+  /** Change the keys preset: its notes are rendered afresh, and the old preset's are let go. */
+  setKeys(voice: KeysVoice): void {
+    if (voice.id === this.keys.id) return;
+    this.keys = voice;
+    for (const map of [this.buffers, this.borrowed]) {
+      for (const key of [...map.keys()]) if (key.startsWith('keys.')) map.delete(key);
+    }
+  }
 
   constructor(ctx: BaseAudioContext) {
     this.ctx = ctx;
@@ -200,7 +222,7 @@ export class SampleBank {
     const m = inRange(inst, midi);
     const root = zoneRoot(m);
     const rate = noteRate(inst, this.ctx.sampleRate);
-    const buffer = this.sound(noteName(inst, root), rate, () => [renderNote(inst, root, rate)]);
+    const buffer = this.sound(noteName(inst, root, this.keys), rate, () => [renderNote(inst, root, rate, this.keys)]);
     return { buffer, rate: Math.pow(2, (m - root) / 12) };
   }
 
