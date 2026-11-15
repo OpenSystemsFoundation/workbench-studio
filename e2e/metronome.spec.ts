@@ -10,13 +10,64 @@ test.describe('metronome tab', () => {
     await expect(page.getByTestId('metronome-transport')).toBeVisible();
   });
 
-  test('shows the transport, tracker, automation, mic and log cards', async ({ page }) => {
+  test('keeps the click in view and puts the rest in sections', async ({ page }) => {
     await expect(page.getByTestId('metronome-bpm')).toHaveText('120');
-    await expect(page.getByTestId('metronome-goal')).toBeVisible();
-    await expect(page.getByTestId('metronome-automation')).toBeVisible();
-    await expect(page.getByTestId('metronome-mic')).toBeVisible();
     await expect(page.getByTestId('metronome-sound')).toBeVisible();
+    // the session goal and the log open first
+    await expect(page.getByTestId('metronome-goal')).toBeVisible();
     await expect(page.getByTestId('metronome-history')).toBeVisible();
+
+    await page.getByTestId('metronome-tab-trainer').click();
+    await expect(page.getByTestId('metronome-automation')).toBeVisible();
+    await expect(page.getByTestId('metronome-goal')).toHaveCount(0);
+    await page.getByTestId('metronome-tab-drone').click();
+    await expect(page.getByTestId('metronome-drone')).toBeVisible();
+    await page.getByTestId('metronome-tab-mic').click();
+    await expect(page.getByTestId('metronome-mic')).toBeVisible();
+    // the click never leaves
+    await expect(page.getByTestId('metronome-play')).toBeVisible();
+
+    // the open section is remembered
+    await page.reload();
+    await page.getByTestId('desktop-tabs').getByRole('tab', { name: 'metronome' }).click();
+    await expect(page.getByTestId('metronome-mic')).toBeVisible();
+  });
+
+  test('type a tempo into the big number, or nudge it from the keyboard', async ({ page }) => {
+    await page.getByTestId('metronome-bpm').click();
+    await page.getByLabel('Type a tempo').fill('96');
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('metronome-bpm')).toHaveText('96');
+    await expect(page.getByTestId('metronome-transport')).toContainText('Andante');
+
+    await page.getByTestId('metronome-transport').getByText('Practice click').click(); // focus off the field
+    await page.keyboard.press('ArrowUp');
+    await expect(page.getByTestId('metronome-bpm')).toHaveText('97');
+    await page.keyboard.press('Shift+ArrowDown');
+    await expect(page.getByTestId('metronome-bpm')).toHaveText('92');
+  });
+
+  test('time signature chips set the meter and the beat display', async ({ page }) => {
+    const sound = page.getByTestId('metronome-sound');
+    const beats = page.getByTestId('metronome-transport').getByRole('img');
+    await expect(beats).toHaveAttribute('aria-label', '4 beats per bar');
+    await sound.getByRole('button', { name: '6/8' }).click();
+    await expect(beats).toHaveAttribute('aria-label', '6 beats per bar');
+    await expect(page.getByTestId('metronome-transport')).toContainText('6/8');
+    // anything else is one step away
+    await sound.getByRole('button', { name: 'Other' }).click();
+    await sound.getByLabel('Beats per bar').fill('11');
+    await expect(beats).toHaveAttribute('aria-label', '11 beats per bar');
+  });
+
+  test('whatever is switched on shows under the click and jumps to its section', async ({ page }) => {
+    await page.getByTestId('metronome-tab-trainer').click();
+    await page.getByRole('tab', { name: 'Ramp / bars' }).click();
+    await page.getByTestId('metronome-tab-mic').click();
+    const active = page.getByTestId('metronome-active');
+    await expect(active).toContainText('Ramp 80→140 over 32 bars');
+    await active.getByRole('button', { name: /Ramp/ }).click();
+    await expect(page.getByTestId('metronome-automation')).toBeVisible();
   });
 
   test('nudge buttons change the tempo', async ({ page }) => {
@@ -27,6 +78,7 @@ test.describe('metronome tab', () => {
   });
 
   test('automation modes reveal their settings', async ({ page }) => {
+    await page.getByTestId('metronome-tab-trainer').click();
     const auto = page.getByTestId('metronome-automation');
     await auto.getByRole('tab', { name: 'Step' }).click();
     await expect(auto.getByLabel('Start BPM')).toBeVisible();
@@ -41,7 +93,7 @@ test.describe('metronome tab', () => {
     // gap-click trainer settings appear once enabled
     await auto.getByRole('button', { name: 'Toggle gap-click trainer' }).click();
     await expect(auto.getByLabel('Play (bars)')).toBeVisible();
-    await auto.getByRole('button', { name: 'Random' }).click();
+    await auto.getByRole('tab', { name: 'Random' }).click();
     await expect(auto.getByLabel(/Mute chance/)).toBeVisible();
   });
 
@@ -72,6 +124,7 @@ test.describe('metronome tab', () => {
     await page.getByTestId('desktop-tabs').getByRole('tab', { name: 'metronome' }).click();
     await expect(page.getByTestId('metronome-bpm')).toHaveText('90');
     // a ramp drill pauses the link
+    await page.getByTestId('metronome-tab-trainer').click();
     await page.getByRole('tab', { name: 'Ramp / time' }).click();
     await expect(page.getByTestId('metronome-link')).toContainText('paused');
   });

@@ -3,7 +3,8 @@ import {
 	bpmFromTapIntervalMs,
 	clampBpm,
 	formatDuration,
-	secondsPerBeat
+	secondsPerBeat,
+	tempoMarking
 } from './timing';
 
 describe('clampBpm', () => {
@@ -41,5 +42,16 @@ describe('formatDuration', () => {
 	});
 	it('adds an hours component past 60 minutes', () => {
 		expect(formatDuration(3661)).toBe('1:01:01');
+	});
+});
+
+describe('tempoMarking', () => {
+	it('names the tempo the way a score would', () => {
+		expect(tempoMarking(50)).toBe('Largo');
+		expect(tempoMarking(72)).toBe('Adagio');
+		expect(tempoMarking(96)).toBe('Andante');
+		expect(tempoMarking(120)).toBe('Allegro');
+		expect(tempoMarking(168)).toBe('Vivace');
+		expect(tempoMarking(240)).toBe('Prestissimo');
 	});
 });

@@ -107,6 +107,7 @@ test('the Metronome tab brings the fretboards back while the drone sounds', asyn
   await page.goto('/');
   await page.keyboard.press('5');
   await expect(page.getByText('BASS · EADG')).toBeHidden();
+  await page.getByTestId('metronome-tab-drone').click();
   await page.getByRole('button', { name: /Play drone/ }).click();
   await expect(page.getByText('BASS · EADG')).toBeVisible();
   await expect(page.getByText('GUITAR · EADGBE')).toBeVisible();

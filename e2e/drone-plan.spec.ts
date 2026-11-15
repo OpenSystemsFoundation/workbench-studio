@@ -49,6 +49,7 @@ test.describe('drone practice plan', () => {
     await page.goto('/');
     await expect(page.getByText('Workbench Studio')).toBeVisible();
     await page.getByTestId('desktop-tabs').getByRole('tab', { name: 'metronome' }).click();
+    await page.getByTestId('metronome-tab-trainer').click();
     await page.getByTestId('metronome-automation').getByRole('tab', { name: 'Plan' }).click();
     await expect(page.getByTestId('metronome-plan')).toBeVisible();
   });
@@ -137,6 +138,7 @@ test.describe('drone practice plan', () => {
     await page.getByTestId('metronome-play').click();
     await expect(page.getByText('✓ Plan complete')).toBeVisible({ timeout: 6000 });
     await expect(page.getByTestId('metronome-play')).toHaveText(/START/);
+    await page.getByTestId('metronome-tab-practice').click();
     await expect(page.getByTestId('metronome-history').getByText(/Plan 4 sections/)).toBeVisible();
   });
 });

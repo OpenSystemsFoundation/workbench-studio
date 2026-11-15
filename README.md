@@ -319,7 +319,9 @@ from the same genre, since all three libraries shelve off one taxonomy.
   tempo automation for rhythm drills (step trainer, smooth ramps by time or bars, gap-click
   mute trainer); practice goals by bars or minutes with auto-stop; an on-device practice log;
   and experimental microphone tempo-following. It runs on its own clock, with buttons to
-  copy tempo to and from the studio, and keeps ticking while you browse other tabs.
+  copy tempo to and from the studio, and keeps ticking while you browse other tabs. The click
+  itself (tempo, beat display, start, tap, meter and the studio tempo link) stays in view;
+  everything else sits beside it in four sections: Session, Trainer, Drone and Mic.
 - **Learn** — six areas: **Theory** (the jazz-harmony curriculum plus the jazz and classical
   palettes, whose chips still place chords into your progression), **Rhythm** (how patterns
   are built, with the anatomy of your loaded groove), **Bass** (the moves behind a line, and

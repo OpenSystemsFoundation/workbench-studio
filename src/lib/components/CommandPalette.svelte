@@ -91,6 +91,7 @@
 
   const SHORTCUTS: Array<[string, string]> = [
     ['Space', 'Play / stop (the click on the Metronome tab)'],
+    ['↑ ↓ · T', 'Metronome tab: nudge the tempo (Shift for 5) · tap it'],
     ['1 – 6', 'Switch tab: Circle, Drums, Chords, Bass, Metronome, Learn'],
     ['Ctrl/⌘ K', 'Command palette: tabs, keys, scales, styles'],
     ['?', 'This list'],
