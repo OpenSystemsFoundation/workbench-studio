@@ -20,7 +20,8 @@ feature parity.
 - **TypeScript** throughout
 - **[Vitest](https://vitest.dev)** for engine unit tests
 - **[Playwright](https://playwright.dev)** for end-to-end tests (desktop + mobile viewports)
-- **Web Audio API** synth — no audio assets, everything is generated
+- **Web Audio API** sound engine — modelled instruments rendered on the device; no audio
+  assets and no audio libraries, everything is generated (see [The sound](#the-sound))
 - **Installable PWA** with a precached app shell for complete offline use after the first load
 
 ## Architecture
@@ -42,7 +43,7 @@ src/
       basslines/       The bassline library: 119 grooves across 31 genres
                        (rockpop, funksoul, hiphop, house, breaks, hard, jazz, world)
       kit.ts           The instrument table: one entry per drum voice, carrying
-                       its row metadata AND its synthesis recipe (noise/tone
+                       its row metadata AND its synthesis recipe (noise/tone/metal
                        layers). Add an instrument by adding an entry — the id
                        union, the grid shape and the audio engine follow.
       drums.ts         Drum genres, grid composition, swing, rhythm concepts
@@ -78,7 +79,15 @@ src/
       out.ts           The wire: Web MIDI ports, timestamped notes, clock, panic
       store.svelte.ts  Connection + mapping state, and the send methods the
                        transport calls on the bar line
-    audio.ts           Web Audio synth engine (isolated from state)
+    synth/             The instruments, as pure DSP with no Web Audio in it (unit-tested)
+      keys.ts          Electric piano: a tine swinging past a pickup
+      strings.ts       Plucked string — the bass and the guitar — as a sum of modes
+      drumkit.ts       Renders a kit recipe (engine/kit.ts) into one buffer per strike
+      room.ts          The stereo room reverb's impulse response
+      bank.ts          Renders each sound once, in idle time, and keeps it as a buffer
+    audio.ts           The sound engine: plays the bank through a small mixing desk
+                       (isolated from state)
+    master.ts          The one output bus and its safety clamp — band, click and drone
     store.svelte.ts    Svelte 5 runes store: $state + actions + view = $derived(computeView)
     context.ts         provideStore()/useStore() context helpers
     components/        StudioBar (brand + transport + key), KeyPicker, GenrePicker,
@@ -98,6 +107,41 @@ independently testable. The **store** holds all reactive state and the actions; 
 **view** layer is a set of pure functions that turn that state into a single `$derived`
 view-model (`store.view`) — components read `store.view.*` and call `store.<action>()`.
 See `docs/IMPROVEMENTS.md` for the prioritized roadmap of proposed enhancements.
+
+## The sound
+
+There are no samples to download and no audio library: every instrument is a small physical
+model, rendered on the device.
+
+- **Keys** are an electric piano modelled the way the instrument works — a tine swinging
+  past a magnetic pickup. The pickup's field is non-linear, so a note barks at the attack
+  and relaxes into a bell-like tone as it decays, with no filter envelope involved.
+- **Bass and guitar** are a plucked string solved as a sum of its modes: where it is
+  plucked, where the pickup sits, how stiff it is, and how fast each mode loses energy. A
+  note starts bright and mellows as it rings, and is exactly in tune.
+- **Drums** are still the table of layered recipes in `engine/kit.ts` — filtered noise, swept
+  tones, and a metallic partial cluster for the hats — rendered ahead of time, several
+  strikes per voice, so a repeated hit is never the same sample twice.
+- **One room** — a generated stereo impulse response — places the band in a shared space, and
+  each drum has its own spot in the stereo field.
+- **One master bus** carries the band, the click and the drone through a single safety clamp.
+
+Why not samples or a library? A sampled piano or kit costs megabytes per instrument to
+download and cache, which this offline-first app would pay on every install; a wrapper such
+as Tone.js schedules the same Web Audio nodes the app already schedules sample-accurately,
+and would not change what they sound like. Modelling gets most of the realism for about
+5 KB of code.
+
+Why render ahead instead of synthesising live? Each sound is computed once, in idle time
+after the page loads (a few milliseconds each), into an `AudioBuffer`. Playing a note is
+then the cheapest thing Web Audio does — one native buffer source — however many partials
+went into it, which keeps phones glitch-free. Notes are rendered every third semitone and
+re-pitched by at most a semitone, so the whole band fits in roughly 15 MB of memory.
+
+The models are plain functions over `Float32Array`s, so `src/lib/synth/synth.test.ts` checks
+them directly: tuning to within two cents, levels, decay, and that every buffer ends on
+silence. `e2e/sound.spec.ts` renders a full band through the real engine offline and holds
+the mix's headroom and stereo width.
 
 ## Development
 

@@ -24,7 +24,7 @@ import { WORLD_PATTERNS } from './patterns/world';
 export { DRUM_VOICES, drumVoice, inKitOrder } from './kit';
 export type {
   DrumVoice, DrumVoiceId, DrumVoiceDef, DrumVoiceKind,
-  DrumSynthLayer, DrumNoiseLayer, DrumToneLayer, DrumFilter, DrumWave,
+  DrumSynthLayer, DrumNoiseLayer, DrumToneLayer, DrumMetalLayer, DrumFilter, DrumWave,
 } from './kit';
 
 export const DRUM_STEPS = 16;

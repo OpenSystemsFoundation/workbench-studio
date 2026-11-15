@@ -4,7 +4,7 @@
 //   oscillators (per pitch × layer × unison) ─ gain ─ pan ─┐
 //                                                          ▼
 //      pre ─ drive (waveshaper) ─ post ─ filter ─ env ─ trem ─ autopan ─┬─ dry ────┐
-//                                                                       ├─ delay ──┤─ out ─ limiter ─ speakers
+//                                                                       ├─ delay ──┤─ out ─ limiter ─ master bus
 //                                                                       └─ reverb ─┘
 //
 // Changing only the key glides the running oscillators to their new pitches —
@@ -16,6 +16,8 @@
 // by the metronome's scheduler while the click runs, so they sit exactly on
 // its grid, and by a small clock of the voice's own when the drone plays alone.
 
+import { masterBus } from '../../master';
+import { roomImpulse } from '../../synth/room';
 import {
 	grooveHits,
 	midiToHz,
@@ -122,7 +124,9 @@ export class DroneVoice {
 		limiter.attack.value = 0.005;
 		limiter.release.value = 0.2;
 		this.bus = ctx.createGain();
-		this.bus.connect(limiter).connect(ctx.destination);
+		// …and then out through the app's one master bus, which watches the
+		// sum of the drone, the click and the band rather than each alone.
+		this.bus.connect(limiter).connect(masterBus(ctx));
 	}
 
 	get running(): boolean {
@@ -318,16 +322,19 @@ export class DroneVoice {
 		const key = Math.round(seconds * 10) / 10;
 		const hit = this.impulses.get(key);
 		if (hit) return hit;
-		// Decaying stereo noise is a perfectly serviceable hall — no samples to load.
+		// A generated hall (synth/room.ts): early reflections, an exponential
+		// tail, and treble that dies before the mids — no samples to load.
 		const rate = this.ctx.sampleRate;
-		const len = Math.max(1, Math.floor(rate * Math.max(0.1, key)));
-		const buf = this.ctx.createBuffer(2, len, rate);
-		for (let ch = 0; ch < 2; ch++) {
-			const d = buf.getChannelData(ch);
-			for (let i = 0; i < len; i++) {
-				d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
-			}
-		}
+		const [l, r] = roomImpulse(rate, {
+			seconds: Math.max(0.1, key),
+			predelay: 0.02,
+			bright: 9000,
+			dark: 1500,
+			lowCut: 120,
+		});
+		const buf = this.ctx.createBuffer(2, l.length, rate);
+		buf.getChannelData(0).set(l);
+		buf.getChannelData(1).set(r);
 		this.impulses.set(key, buf);
 		return buf;
 	}

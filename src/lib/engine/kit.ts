@@ -4,9 +4,12 @@
 // no switch statement to extend, no other file to touch, and the id union and
 // grid shape widen automatically.
 //
-// A voice is built from layers. Each layer is either a filtered noise burst or
-// a pitched oscillator swept from f0 to f1, both with an exponential decay:
-// stack two or three and you have a convincing drum-machine voice.
+// A voice is built from layers. Each layer is a filtered noise burst, a pitched
+// oscillator swept from f0 to f1, or a cluster of metallic partials, all with
+// an exponential decay: stack two or three and you have a convincing
+// drum-machine voice. The layers are rendered once into a buffer
+// (synth/drumkit.ts), so a recipe can be as rich as it likes — a hit costs the
+// same to play however many layers went into it.
 
 /** Filter shapes and waveforms, named here so the engine stays DOM-free. */
 export type DrumFilter = 'lowpass' | 'highpass' | 'bandpass';
@@ -30,9 +33,27 @@ export interface DrumToneLayer {
   readonly f1: number;     // frequency it sweeps down (or up) to
   readonly wave?: DrumWave; // default 'sine'
   readonly at?: number;
+  readonly sweep?: number; // seconds the pitch takes to fall from f0 to f1 (default: half of dur)
+  readonly drive?: number; // saturation at the hit, easing to clean as it decays (default: none)
 }
 
-export type DrumSynthLayer = DrumNoiseLayer | DrumToneLayer;
+/**
+ * The metallic cluster of a drum machine's hats and cymbals: six square waves
+ * at inharmonic ratios above `base`, through a filter. Noise has no partials
+ * and reads as hiss; this has hundreds, fixed and unrelated, and reads as metal.
+ */
+export interface DrumMetalLayer {
+  readonly kind: 'metal';
+  readonly dur: number;
+  readonly amp: number;
+  readonly base: number;   // frequency of the lowest of the six squares, in Hz
+  readonly filter: DrumFilter;
+  readonly freq: number;
+  readonly q?: number;
+  readonly at?: number;
+}
+
+export type DrumSynthLayer = DrumNoiseLayer | DrumToneLayer | DrumMetalLayer;
 
 /** Row families, used to keep the grid stacked the way a kit reads on paper. */
 export type DrumVoiceKind = 'cymbal' | 'hat' | 'perc' | 'drum' | 'bass';
@@ -45,6 +66,8 @@ export interface DrumVoiceDef {
   readonly kind: DrumVoiceKind;
   readonly hint: string;   // what it is / when to reach for it, shown in the add-row picker
   readonly synth: readonly DrumSynthLayer[];
+  readonly pan?: number;   // where it sits across the stereo field, -1 (left) … 1 (right); default centre
+  readonly room?: number;  // how much of it is sent to the room reverb, 0 … 1; default 0.1
 }
 
 // Top-to-bottom order of the groovebox rows: cymbals up top, kick on the floor,
@@ -92,16 +115,27 @@ export const DRUM_VOICES = [
       { kind: 'noise', dur: 0.8, amp: 0.09, filter: 'bandpass', freq: 5100, q: 4.8 },
       { kind: 'noise', dur: 1.1, amp: 0.07, filter: 'bandpass', freq: 7400, q: 5.6 },
     ],
+    pan: 0.3, room: 0.12,
   },
   {
     id: 'ohat', name: 'Open Hat', short: 'OH', color: '#8a6d3b', kind: 'hat',
     hint: 'The off-beat answer in house, techno and disco.',
-    synth: [{ kind: 'noise', dur: 0.32, amp: 0.26, filter: 'highpass', freq: 6500 }],
+    // Noise for the wash, the metallic cluster under it for the ring: on its
+    // own the noise is hiss, and the cluster is what makes it a cymbal.
+    synth: [
+      { kind: 'noise', dur: 0.32, amp: 0.2, filter: 'highpass', freq: 6500 },
+      { kind: 'metal', dur: 0.3, amp: 0.2, base: 205.3, filter: 'highpass', freq: 6800 },
+    ],
+    pan: -0.22, room: 0.08,
   },
   {
     id: 'chat', name: 'Closed Hat', short: 'HH', color: '#7a5ea8', kind: 'hat',
     hint: 'The default subdivision layer — 8ths or 16ths.',
-    synth: [{ kind: 'noise', dur: 0.045, amp: 0.32, filter: 'highpass', freq: 7500 }],
+    synth: [
+      { kind: 'noise', dur: 0.045, amp: 0.25, filter: 'highpass', freq: 7500 },
+      { kind: 'metal', dur: 0.04, amp: 0.24, base: 205.3, filter: 'highpass', freq: 7800 },
+    ],
+    pan: -0.22, room: 0.06,
   },
   {
     id: 'shaker', name: 'Shaker / Tambourine', short: 'SH', color: '#9b86c4', kind: 'hat',
@@ -110,6 +144,7 @@ export const DRUM_VOICES = [
       { kind: 'noise', dur: 0.07, amp: 0.2, filter: 'bandpass', freq: 6200, q: 0.9 },
       { kind: 'noise', dur: 0.03, amp: 0.1, filter: 'highpass', freq: 9500 },
     ],
+    pan: 0.32, room: 0.12,
   },
   {
     id: 'cowbell', name: 'Cowbell / Block', short: 'CB', color: '#7d8a4f', kind: 'perc',
@@ -122,6 +157,7 @@ export const DRUM_VOICES = [
       { kind: 'tone', dur: 0.26, amp: 0.07, f0: 800, f1: 795, wave: 'square' },
       { kind: 'noise', dur: 0.02, amp: 0.04, filter: 'highpass', freq: 5000 },
     ],
+    pan: -0.3, room: 0.16,
   },
   {
     id: 'clap', name: 'Clap', short: 'CP', color: '#a84a6e', kind: 'perc',
@@ -132,6 +168,7 @@ export const DRUM_VOICES = [
       { kind: 'noise', dur: 0.03, amp: 0.4, filter: 'bandpass', freq: 1400, q: 1.4, at: 0.022 },
       { kind: 'noise', dur: 0.16, amp: 0.35, filter: 'bandpass', freq: 1300, q: 1.2, at: 0.033 },
     ],
+    room: 0.3,
   },
   {
     id: 'rim', name: 'Rim / Stick', short: 'RM', color: '#97a59c', kind: 'perc',
@@ -140,37 +177,61 @@ export const DRUM_VOICES = [
       { kind: 'tone', dur: 0.05, amp: 0.4, f0: 830, f1: 780, wave: 'triangle' },
       { kind: 'noise', dur: 0.02, amp: 0.15, filter: 'highpass', freq: 3200 },
     ],
+    pan: 0.12, room: 0.22,
   },
   {
     id: 'snare', name: 'Snare', short: 'SD', color: '#3f6b5f', kind: 'drum',
     hint: 'The backbeat, and every ghost note around it.',
     synth: [
+      // The shell: its two lowest modes, the upper one gone almost at once.
       { kind: 'tone', dur: 0.12, amp: 0.3, f0: 220, f1: 165, wave: 'triangle' },
+      { kind: 'tone', dur: 0.06, amp: 0.14, f0: 372, f1: 330 },
+      // The wires: the body of the rattle, and the crisp top that carries it
+      // through a mix and out of a small speaker.
       { kind: 'noise', dur: 0.19, amp: 0.45, filter: 'bandpass', freq: 1900, q: 0.7 },
+      { kind: 'noise', dur: 0.13, amp: 0.16, filter: 'highpass', freq: 5600 },
     ],
+    room: 0.22,
   },
   {
     id: 'htom', name: 'High Tom / Conga', short: 'HT', color: '#7f9bbd', kind: 'drum',
     hint: 'The higher of two hand drums — conga open tones, tom fills.',
-    synth: [{ kind: 'tone', dur: 0.22, amp: 0.55, f0: 300, f1: 180 }],
+    synth: [
+      { kind: 'tone', dur: 0.22, amp: 0.55, f0: 300, f1: 180 },
+      // a drumhead's second mode sits near 1.6× the first, and dies sooner
+      { kind: 'tone', dur: 0.09, amp: 0.1, f0: 480, f1: 288 },
+      { kind: 'noise', dur: 0.014, amp: 0.1, filter: 'lowpass', freq: 3000 },
+    ],
+    pan: -0.28, room: 0.2,
   },
   {
     id: 'ltom', name: 'Low Tom', short: 'LT', color: '#5b7a9e', kind: 'drum',
     hint: 'Floor tom and the low hand drum answering it.',
-    synth: [{ kind: 'tone', dur: 0.28, amp: 0.65, f0: 160, f1: 92 }],
+    synth: [
+      { kind: 'tone', dur: 0.28, amp: 0.65, f0: 160, f1: 92 },
+      { kind: 'tone', dur: 0.11, amp: 0.11, f0: 256, f1: 147 },
+      { kind: 'noise', dur: 0.014, amp: 0.1, filter: 'lowpass', freq: 2400 },
+    ],
+    pan: 0.3, room: 0.2,
   },
   {
     id: 'kick', name: 'Kick', short: 'BD', color: '#c2562e', kind: 'drum',
     hint: 'The foundation. Start every pattern here.',
     synth: [
-      { kind: 'tone', dur: 0.4, amp: 0.85, f0: 150, f1: 48 },
+      // The body. Driven at the hit, so the first few cycles carry harmonics a
+      // phone speaker can reproduce; by the tail it is the clean sine it was.
+      { kind: 'tone', dur: 0.4, amp: 0.74, f0: 150, f1: 48, drive: 0.7 },
+      // The beater: a fast knock from the mids down into the body.
+      { kind: 'tone', dur: 0.03, amp: 0.16, f0: 420, f1: 110, sweep: 0.018 },
       { kind: 'noise', dur: 0.02, amp: 0.25, filter: 'lowpass', freq: 3500 },
     ],
+    room: 0.03,
   },
   {
     id: 'sub', name: 'Sub / 808', short: '808', color: '#8c3a1f', kind: 'bass',
     hint: 'Long pitched sub: 808 lines, hardstyle reverse bass, amapiano log drum.',
-    synth: [{ kind: 'tone', dur: 0.6, amp: 0.7, f0: 92, f1: 44 }],
+    synth: [{ kind: 'tone', dur: 0.6, amp: 0.7, f0: 92, f1: 44, drive: 0.5 }],
+    room: 0,
   },
 ] as const satisfies readonly DrumVoiceDef[];
 

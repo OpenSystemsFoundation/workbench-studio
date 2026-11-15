@@ -8,6 +8,7 @@
 // This module is framework-free so it can be unit-reasoned about and reused.
 
 import { getAudioContext } from './context';
+import { masterBus } from '../master';
 import { playClick, VOICES } from './click';
 import { clampBpm, secondsPerBeat } from './timing';
 
@@ -120,7 +121,8 @@ export class MetronomeEngine {
 		if (this.ctx.state !== 'running') await this.ctx.resume();
 		if (!this.master) {
 			this.master = this.ctx.createGain();
-			this.master.connect(this.ctx.destination);
+			// out through the app's one master bus, with the band and the drone
+			this.master.connect(masterBus(this.ctx));
 		}
 		this.master.gain.value = this.cfg.volume;
 
