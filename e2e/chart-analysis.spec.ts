@@ -11,6 +11,8 @@ async function openChords(page: Page) {
 }
 
 async function enter(page: Page, line: string) {
+  const toggle = page.getByRole('button', { name: 'Type chord changes' });
+  if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
   await page.getByPlaceholder(/Cm7 F7/).fill(line);
   await page.getByTestId('add-typed').click();
 }

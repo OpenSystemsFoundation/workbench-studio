@@ -13,6 +13,8 @@ async function openChords(page: Page) {
 }
 
 async function enter(page: Page, line: string) {
+  const toggle = page.getByRole('button', { name: 'Type chord changes' });
+  if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click();
   await page.getByPlaceholder(/Cm7 F7/).fill(line);
   await page.getByTestId('add-typed').click();
 }
@@ -78,4 +80,17 @@ test.describe('placing silence in a progression', () => {
     // visible from the tab that writes the line.
     await expect(page.getByTestId('bass-over')).toContainText('N.C.');
   });
+});
+
+test('typing changes is optional: hidden until switched on, and remembered', async ({ page }) => {
+  await openChords(page);
+  const field = page.getByLabel('Enter chord changes');
+  await expect(field).toHaveCount(0);
+  await page.getByRole('button', { name: 'Type chord changes' }).click();
+  await expect(field).toBeVisible();
+  await page.reload();
+  await page.getByTestId('desktop-tabs').getByRole('tab', { name: 'chords' }).click();
+  await expect(page.getByLabel('Enter chord changes')).toBeVisible();
+  await page.getByRole('button', { name: 'Type chord changes' }).click();
+  await expect(page.getByLabel('Enter chord changes')).toHaveCount(0);
 });

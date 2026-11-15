@@ -12,6 +12,7 @@ test.describe('drone: following the Chords progression', () => {
   test('sounds each chord’s root and lights its chord scale', async ({ page }) => {
     await page.goto('/');
     await page.getByTestId('desktop-tabs').getByRole('tab', { name: 'chords' }).click();
+    await page.getByRole('button', { name: 'Type chord changes' }).click();
     await page.getByPlaceholder(/Cm7 F7/).fill('Dm7 G7 Cmaj7');
     await page.getByTestId('add-typed').click();
     await expect(page.locator('[data-chip]')).toHaveCount(3);
@@ -108,6 +109,7 @@ test.describe('drone: following the Chords progression', () => {
     });
     await page.goto('/');
     await page.getByTestId('desktop-tabs').getByRole('tab', { name: 'chords' }).click();
+    await page.getByRole('button', { name: 'Type chord changes' }).click();
     await page.getByPlaceholder(/Cm7 F7/).fill('Dm7 G7 Cmaj7');
     await page.getByTestId('add-typed').click();
     // sound the studio once so its context exists first

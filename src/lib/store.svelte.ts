@@ -64,6 +64,7 @@ export type ChordSlot = 'half' | 'bar';
 // A late or jittery wake-up then changes when we *schedule*, never when
 // anything *sounds*.
 const KEYS_KEY = 'workbench.keys';
+const TYPE_ENTRY_KEY = 'workbench.typeChanges';
 const LOOKAHEAD_MS = 25;
 const SCHEDULE_AHEAD_S = 0.12;
 
@@ -404,6 +405,7 @@ export class WorkbenchStore {
     try {
       const keys = typeof localStorage !== 'undefined' ? localStorage.getItem(KEYS_KEY) : null;
       if (keys && KEYS_VOICES.some((v) => v.id === keys)) { this.keysSound = keys; this.audio.setKeys(keys); }
+      this.typeEntry = localStorage.getItem(TYPE_ENTRY_KEY) === '1';
     } catch { /* storage unavailable */ }
     this.hist = [JSON.stringify(this.songSnapshot())];
     // Opt-in two-way link between the studio tempo and the click's base tempo.
@@ -453,6 +455,16 @@ export class WorkbenchStore {
     this.stopDraw();
     this.seqTimers.forEach((id) => clearTimeout(id));
     this.singleTimers.forEach((id) => clearTimeout(id));
+  }
+
+  // ---- typing chord changes ----
+  // Typing a chart in is one way to build a progression, not the main one, so
+  // the field stays tucked away until asked for. Like the keys' sound it is the
+  // player's preference, kept on its own and not part of the song.
+  typeEntry = $state(false);
+  setTypeEntry(on: boolean): void {
+    this.typeEntry = on;
+    try { localStorage.setItem(TYPE_ENTRY_KEY, on ? '1' : '0'); } catch { /* best-effort */ }
   }
 
   // ---- the keys' sound ----
