@@ -63,7 +63,7 @@ src/
       chords.ts        Progression strip, diatonic/colour palettes, chord inspector
       bass.ts          The line, the groove shelf, the annotated library cards,
                        and the count / note / change rows tracked under the line
-      patterns.ts      Pattern library, chord shapes, fret-diagram tabs
+      patterns.ts      Pattern library, chord shapes, fret diagrams
       drums.ts         Groovebox grid, genre → pattern picker, layer stepper
       picker.ts        Shelf/chip builders shared by all the genre pickers
       learn.ts         Jazz curriculum, the jazz/classical palettes, rhythm
@@ -87,17 +87,29 @@ src/
       bank.ts          Renders each sound once, in idle time, and keeps it as a buffer
     audio.ts           The sound engine: plays the bank through a small mixing desk
                        (isolated from state)
+    learn/
+      catalog.ts       The Learn library's catalogue: ONE tree of shelves, books
+                       and pages (unit-tested). The tree rail, breadcrumbs, index
+                       pages, pager, search and command palette all read it, so
+                       a new lesson is one entry here plus its page component.
     master.ts          The one output bus and its safety clamp — band, click and drone
     store.svelte.ts    Svelte 5 runes store: $state + actions + view = $derived(computeView)
     context.ts         provideStore()/useStore() context helpers
     components/        StudioBar (brand + transport + key), KeyPicker, GenrePicker,
                        CircleMode, DrumsMode, ChordsMode, BassMode, MetronomeMode,
-                       LearnMode, EarMode, ReadingMode, Staff, Instruments,
-                       Fretboard, FretDiagram, Piano, MidiPanel
+                       LearnMode (the library's reading room), EarMode,
+                       ReadingMode, Staff, Instruments, Fretboard, FretDiagram,
+                       Piano, MidiPanel
+      ui/              Small presentational parts with no knowledge of the store:
+                       Tag, SectionHead, FieldLabel, Callout, Card, Chip,
+                       PlayButton, Legend. Scoped styles, tokens from app.css.
       parts/           Widgets used at two altitudes — bare in a tool tab, wrapped
-                       in teaching copy in Learn (ChordInspector)
-      learn/           The six Learn areas: Theory, Rhythm, Bass, Patterns,
-                       Practice, Forms
+                       in teaching copy in Learn (ChordInspector) — and ChordChip,
+                       the one chip every lesson and palette draws a chord with
+      learn/           The library furniture — LibraryTree, LibraryCrumbs,
+                       LibraryIndex, LibraryPager — and pages.ts, the registry
+                       that maps a catalogue page kind to its component
+        pages/         One component per kind of lesson
   App.svelte           Adaptive shell (desktop tabs + side panel / mobile dock + tab bar)
   main.ts              Mount entry
 ```
@@ -322,9 +334,14 @@ from the same genre, since all three libraries shelve off one taxonomy.
   copy tempo to and from the studio, and keeps ticking while you browse other tabs. The click
   itself (tempo, beat display, start, tap, meter and the studio tempo link) stays in view;
   everything else sits beside it in four sections: Session, Trainer, Drone and Mic.
-- **Learn** — six areas: **Theory** (the jazz-harmony curriculum plus the jazz and classical
-  palettes, whose chips still place chords into your progression), **Rhythm** (how patterns
-  are built, with the anatomy of your loaded groove), **Bass** (the moves behind a line, and
-  the annotated groove library), **Patterns** (scales, pentatonics, arpeggios, licks, chord
-  shapes and fretboard diagrams), **Practice** (ear training and sight reading), and
-  **Forms** (song structures as proportional timelines).
+- **Learn** — a library. Seven shelves hold books, books hold pages: **Harmony** (the
+  eight-chapter jazz & groove harmony book, the jazz and classical palettes whose chips still
+  place chords into your progression, the chord inspector explained, chord shapes on the
+  circle), **Scales & melody** (scales, pentatonics, arpeggios, licks), **Fretboard** (boxes,
+  CAGED, soloing, barre and bass chords), **Rhythm** (how patterns are built, and the anatomy
+  of your loaded groove), **Bass** (the moves behind a line, reading the grid, and the
+  annotated groove library), **Song form** (structures as proportional timelines) and
+  **Practice** (ear training and sight reading). A collapsible tree with a search box sits
+  beside the page on desktop and folds behind **BROWSE** on a phone; breadcrumbs lead back up,
+  every shelf and book has an index page, a pager reads on front to back, and the app reopens
+  on the page you left. The command palette lists every page too.

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openLearnPage } from './learn';
 
 test.use({ viewport: { width: 1280, height: 900 } });
 
@@ -6,10 +7,9 @@ test.describe('sight reading', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await expect(page.getByText('Workbench Studio')).toBeVisible();
-    // Sight reading is Learn → Practice → Sight reading now.
+    // Sight reading is a page on the Learn library's Practice shelf.
     await page.getByTestId('desktop-tabs').getByRole('tab', { name: 'learn' }).click();
-    await page.getByTestId('learn-tabs').getByRole('tab', { name: 'practice' }).click();
-    await page.getByTestId('practice-drills').getByRole('tab', { name: 'reading' }).click();
+    await openLearnPage(page, 'Sight reading');
     await expect(page.getByTestId('reading-staff')).toBeVisible();
   });
 

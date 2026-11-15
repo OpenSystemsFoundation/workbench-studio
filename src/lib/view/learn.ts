@@ -1,7 +1,8 @@
 // Learn-mode view. This is where the studio's theory lives: the jazz-harmony
 // curriculum, the jazz and classical chord palettes that used to be styles of
 // the chord workshop, rhythm theory, bassline moves and song-structure
-// timelines — plus the subtab row that navigates them.
+// timelines. What is shelved where — and so how you get to any of it — is the
+// catalogue's business (learn/catalog.ts); this file only builds the content.
 //
 // The tool tabs build; this tab explains. Anything longer than a one-line hint
 // belongs on this side of the line.
@@ -17,7 +18,7 @@ import {
 } from '../engine/data';
 import { RHYTHM_CONCEPTS } from '../engine/drums';
 import { BASS_TRICKS } from '../engine/bass';
-import type { WorkbenchStore, LearnTab, PracticeDrill } from '../store.svelte';
+import type { WorkbenchStore } from '../store.svelte';
 import type { PaletteChip } from './types';
 
 // Build a chord from a curriculum row, relative to the current tonic.
@@ -35,7 +36,6 @@ export function buildLearn(s: WorkbenchStore) {
 
   const JZ = jazzChapters(t, s.scale);
   const jzi = Math.min(s.jazzCh || 0, JZ.length - 1);
-  const jazzNav = JZ.map((c, i) => ({ name: c.name, tag: c.tag, i, border: i === jzi ? '#c2562e' : '#cbb792', bg: i === jzi ? '#fbeede' : '#f6efe0', fg: i === jzi ? '#c2562e' : '#5c4a30' }));
   const jzc: JazzChapter = JZ[jzi];
   const jazzBlocks = jzc.blocks.map((b) => {
     if (b.kind === 'chords') {
@@ -80,34 +80,8 @@ export function buildLearn(s: WorkbenchStore) {
   const cadences = cadenceDefs.map((c) => ({ name: c.name, defs: c.defs }));
   const clProgs = classicalProgDefs.map((p) => ({ name: p.name, defs: p.defs }));
 
-  const learnTabs = ([
-    ['theory', 'Theory'], ['rhythm', 'Rhythm'], ['bass', 'Bass'],
-    ['patterns', 'Patterns'], ['practice', 'Practice'], ['forms', 'Forms'],
-  ] as Array<[LearnTab, string]>).map(([id, name]) => ({
-    id, name, border: s.learnTab === id ? '#c2562e' : '#cbb792', bg: s.learnTab === id ? '#c2562e' : '#f6efe0', fg: s.learnTab === id ? '#fff' : '#5c4a30',
-  }));
-  const drillChips = ([['ear', 'Ear training'], ['reading', 'Sight reading']] as Array<[PracticeDrill, string]>).map(([id, name]) => ({
-    id, name, border: s.practiceDrill === id ? '#3f6b5f' : '#cbb792', bg: s.practiceDrill === id ? '#3f6b5f' : '#f6efe0', fg: s.practiceDrill === id ? '#fff' : '#5c4a30',
-  }));
-
-  // A one-line subject for each area, shown under the Learn eyebrow.
-  const learnSubject: Record<LearnTab, string> = {
-    theory: 'harmony you can play — in ' + spell(t, t, s.scale),
-    rhythm: 'how drum patterns are built',
-    bass: 'the moves behind a bassline',
-    patterns: 'scales, arpeggios and shapes on the neck',
-    practice: 'drills for the ear and the eye',
-    forms: 'how songs are built in time',
-  };
-
   return {
-    jazzNav, jazzBlocks, jazzTitle: jzc.name, jazzIntro: jzc.intro, jazzTag: jzc.tag,
-    // subtabs
-    learnTabs, drillChips, learnSubject: learnSubject[s.learnTab],
-    learnTabTheory: s.learnTab === 'theory', learnTabRhythm: s.learnTab === 'rhythm',
-    learnTabBass: s.learnTab === 'bass', learnTabPatterns: s.learnTab === 'patterns',
-    learnTabPractice: s.learnTab === 'practice', learnTabForms: s.learnTab === 'forms',
-    drillEar: s.practiceDrill === 'ear', drillReading: s.practiceDrill === 'reading',
+    jazzBlocks, jazzIntro: jzc.intro,
     // the teaching palettes
     jzDia, jzBorrow, jzSecondary, quickProgs, clDia, cadences, clProgs,
     bassTricks: BASS_TRICKS.map((tk) => ({ id: tk.id, name: tk.name, why: tk.why })),
