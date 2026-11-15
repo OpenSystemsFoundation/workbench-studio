@@ -118,7 +118,7 @@ model, rendered on the device.
   and relaxes into a bell-like tone as it decays, with no filter envelope involved.
   It comes in four presets, picked on the Chords tab and remembered between visits:
   **Suitcase** (the default — soft, dark and lush, with stereo vibrato and chorus), **Stage**
-  (dry, more bark), **Bell** (glassy, wide chorus, and the only one that rolls a chord — the others land it as a block) and **Reed** (a reed piano, nasal, with
+  (dry, more bark), **Pad** (no hammer at all: notes swell in and hang, under deep chorus and room) and **Reed** (a reed piano, nasal, with
   its tremolo throb). A preset is the same model with the pickup moved and the effects
   changed, so adding one is an entry in `KEYS_VOICES` in `synth/keys.ts`.
 - **Bass and guitar** are a plucked string solved as a sum of its modes: where it is

@@ -23,7 +23,7 @@ test.describe('keys presets', () => {
 
   test('the lush preset is the default, and the others are one tap away', async ({ page }) => {
     await expect(page.getByTestId('keys-suitcase')).toHaveAttribute('aria-pressed', 'true');
-    for (const id of ['stage', 'bell', 'reed']) {
+    for (const id of ['stage', 'pad', 'reed']) {
       await expect(page.getByTestId(`keys-${id}`)).toHaveAttribute('aria-pressed', 'false');
     }
   });

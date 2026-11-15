@@ -86,11 +86,13 @@ export const KEYS_VOICES: readonly KeysVoice[] = [
     fx: { tremRate: 4.3, tremPan: 0, tremAmp: 0, chorus: 0, room: 0.2, level: 1 },
   },
   {
-    // The glassy 80s ballad voicing: all bell, a thin body, wide chorus.
-    id: 'bell', name: 'Bell', hint: 'Glassy and bright: a strong bell over a light body, wide chorus',
-    pickup: 'magnetic', depth: [0.6, 0.42], offset: [0.82, 0.9],
-    chime: 3.2, chimeRing: 2.2, sustain: 2.8, bite: 0.42, thump: 0.02, rise: 0.0025, roll: 1, top: 9000,
-    fx: { tremRate: 0.9, tremPan: 0.3, tremAmp: 0, chorus: 0.55, room: 0.4, level: 0.8 },
+    // Not a struck sound at all: the same tine with the hammer taken away, so
+    // each note swells in over a tenth of a second and hangs there, with no
+    // bell and no thump, under the deepest chorus and the most room.
+    id: 'pad', name: 'Pad', hint: 'A soft pad: notes swell in and hang, deep chorus, lots of room',
+    pickup: 'magnetic', depth: [0.42, 0.3], offset: [0.4, 0.5],
+    chime: 0, chimeRing: 1, sustain: 7, bite: 0, thump: 0, rise: 0.11, roll: 0, top: 3000,
+    fx: { tremRate: 0.45, tremPan: 0.3, tremAmp: 0, chorus: 0.8, room: 0.55, level: 0.13 },
   },
   {
     // The other electric piano: a reed, nasal and biting, with its throb.
