@@ -214,9 +214,13 @@ iOS requires: it ignores SVG icons when adding to the home screen.
 
 ## Deployment (GitHub Pages)
 
-`.github/workflows/deploy.yml` runs the unit tests, builds with the correct base path
-(`/<repo>/`), and publishes `dist/` to GitHub Pages on every push to `main` (and this
-feature branch).
+`.github/workflows/deploy.yml` runs the typecheck and unit tests, builds with the correct base path
+(`/<repo>/`), and publishes `dist/` to GitHub Pages on every push to `main`.
+
+**Hosting elsewhere:** the build is a static site with no server code. Run
+`VITE_BASE=/ npm run build` (or `VITE_BASE=/sub/path/` for a sub-path) and serve `dist/`
+from any static host. It must be served over HTTPS for the service worker and install
+prompt to work; unknown paths should fall back to `index.html`.
 
 **One-time setup:** in the repository, go to **Settings → Pages → Build and deployment →
 Source** and select **GitHub Actions**. After that, each qualifying push deploys
