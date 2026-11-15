@@ -79,7 +79,7 @@ export class AudioEngine {
   private keys: KeysVoice = DEFAULT_KEYS;
   /** The knobs of the keys' effects, set from the preset. */
   private keysFx: {
-    room: AudioParam; level: AudioParam; chorus: AudioParam;
+    room: AudioParam; chorus: AudioParam;
     tremRate: AudioParam; tremPan: AudioParam; tremAmp: AudioParam; tremBase: AudioParam;
   } | null = null;
   volume = 0.78;
@@ -118,7 +118,7 @@ export class AudioEngine {
       // The keyboard, laid out left to right like the instrument, then through
       // the two effects an electric piano is rarely heard without:
       //
-      //   keys ─┬───────────────────────────┬─ tremolo (level, then pan) ─ trim ─ band
+      //   keys ─┬───────────────────────────┬─ tremolo (level, then pan) ─ band
       //         └─ chorus: two swept delays ┘
       //
       // The chorus is a pair of short delays whose length drifts slowly, one
@@ -158,17 +158,16 @@ export class AudioEngine {
       });
       const tremLevel = ctx.createGain();
       const tremPan = ctx.createStereoPanner();
-      const trim = ctx.createGain();
       keysMix.connect(tremLevel);
       chorus.connect(tremLevel);
-      tremLevel.connect(tremPan).connect(trim).connect(this.band);
+      tremLevel.connect(tremPan).connect(this.band);
       const trem = lfo(4.3);
       const toLevel = ctx.createGain();
       const toPan = ctx.createGain();
       trem.connect(toLevel).connect(tremLevel.gain);
       trem.connect(toPan).connect(tremPan.pan);
       this.keysFx = {
-        room: keysRoom.gain, level: trim.gain, chorus: chorus.gain,
+        room: keysRoom.gain, chorus: chorus.gain,
         tremRate: trem.frequency, tremPan: toPan.gain, tremAmp: toLevel.gain, tremBase: tremLevel.gain,
       };
       this.bank.setKeys(this.keys);
@@ -275,7 +274,10 @@ export class AudioEngine {
     src.buffer = buffer;
     src.playbackRate.value = rate;
     const g = ctx.createGain();
-    g.gain.value = amp;
+    // A keys preset's loudness trim rides on the note, not on the bus: a note
+    // keeps the level of the preset it was struck with, so changing preset
+    // while notes ring (or are queued a bar ahead) cannot lift or drop them.
+    g.gain.value = inst === 'keys' ? amp * this.keys.fx.level : amp;
     src.connect(g).connect(this.busFor(inst, midi));
     src.start(t);
     return { src, g };
@@ -472,10 +474,7 @@ export class AudioEngine {
       if (immediate) p.value = v;
       else p.setTargetAtTime(v, t, 0.03);
     };
-    // the send is taken before the trim, so it is scaled with it: a preset's
-    // room is a proportion of its own level, not of the raw sample
-    set(fx.room, f.room * f.level);
-    set(fx.level, f.level);
+    set(fx.room, f.room);
     set(fx.chorus, f.chorus);
     set(fx.tremRate, f.tremRate);
     set(fx.tremPan, f.tremPan);
