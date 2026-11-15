@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openLearnPage } from './learn';
 
 test.use({ viewport: { width: 1280, height: 900 } });
 
@@ -41,13 +42,13 @@ test.describe('desktop layout', () => {
     await expect(page.getByTestId('bass-line')).toBeVisible();
 
     await tabs.getByRole('tab', { name: 'learn' }).click();
-    await expect(page.getByText('Eight building blocks of jazz & groove harmony')).toBeVisible();
+    await expect(page.getByTestId('learn-index')).toBeVisible();
 
-    // the drills and the pattern library are subtabs of Learn now
-    await page.getByTestId('learn-tabs').getByRole('tab', { name: 'practice' }).click();
+    // the drills and the pattern library are pages of the Learn library now
+    await openLearnPage(page, 'Ear training');
     await expect(page.getByText('TAP TO PLAY · LISTEN')).toBeVisible();
 
-    await page.getByTestId('learn-tabs').getByRole('tab', { name: 'patterns' }).click();
+    await openLearnPage(page, 'Scales');
     await expect(page.getByText('FORMULA')).toBeVisible();
 
     await tabs.getByRole('tab', { name: 'circle' }).click();

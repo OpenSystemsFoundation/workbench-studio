@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { openLearnPage } from './learn';
 
 // What a standalone install on an iPhone 12 Pro reports for
 // env(safe-area-inset-*). Chromium does not emulate the insets, so the tests
@@ -100,7 +101,7 @@ test.describe('phone in landscape', () => {
     expect(Math.max(...overflow)).toBeLessThanOrEqual(0);
 
     await page.getByTestId('mobile-tabs').getByRole('tab', { name: 'learn' }).click();
-    await page.getByTestId('learn-tabs').getByRole('tab', { name: 'patterns' }).click();
+    await openLearnPage(page, 'Scales');
     await expect(page.getByText('FORMULA')).toBeVisible();
   });
 });

@@ -154,6 +154,11 @@ this tab is open; everywhere else Space drives the global transport.
 
 ### Learn
 
+> Superseded: the subtab row described here has since become a library — a tree of
+> shelves, books and pages driven by one catalogue (`src/lib/learn/catalog.ts`). `LearnTab`,
+> the practice drill, the jazz chapter and the pattern category are now a single
+> `learnPage` id. See the README's Learn entry.
+
 A subtab chip row, extending the pattern `LearnMode` already uses:
 
 | Subtab | Content |

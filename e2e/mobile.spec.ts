@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openLearnPage } from './learn';
 
 test.use({ viewport: { width: 390, height: 844 } });
 
@@ -42,9 +43,9 @@ test.describe('mobile layout', () => {
     await expect(page.getByTestId('bass-line')).toBeVisible();
 
     await tabs.getByRole('tab', { name: 'learn' }).click();
-    await expect(page.getByText('Eight building blocks of jazz & groove harmony')).toBeVisible();
+    await expect(page.getByTestId('learn-index')).toBeVisible();
 
-    await page.getByTestId('learn-tabs').getByRole('tab', { name: 'patterns' }).click();
+    await openLearnPage(page, 'Scales');
     await expect(page.getByText('FORMULA')).toBeVisible();
 
     await tabs.getByRole('tab', { name: 'circle' }).click();
