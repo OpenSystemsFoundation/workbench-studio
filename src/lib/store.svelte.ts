@@ -465,12 +465,8 @@ export class WorkbenchStore {
     this.keysSound = id;
     this.audio.setKeys(id);
     try { localStorage.setItem(KEYS_KEY, id); } catch { /* best-effort */ }
-    // Let it be heard: the chord in hand, or the key's own.
-    if (!this.jzPlaying) {
-      const ch = this.activeChord && !isRest(this.activeChord) ? this.activeChord : null;
-      if (ch) this.playChord(ch, 0.03, undefined, 1.8);
-      else this.playMidis([48 + this.tonicPc, 55 + this.tonicPc, 60 + this.tonicPc, 64 + this.tonicPc], 1.8, 0.03);
-    }
+    // Silent: the next note played is the new preset's. Choosing one does not
+    // sound a chord of its own over whatever is playing.
   }
 
   /**
