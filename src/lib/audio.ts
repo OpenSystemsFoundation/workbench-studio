@@ -325,7 +325,9 @@ export class AudioEngine {
       midis.forEach((m) => this.bank!.note(inst, m));
       const t0 = this.startTime(at);
       const amp = LEVEL[inst] * this.chordAmp(midis.length);
-      midis.forEach((m, i) => this.voice(inst, m, t0 + i * stagger, dur, amp));
+      // how much of the strum the keys preset keeps
+      const roll = inst === 'keys' ? stagger * this.keys.roll : stagger;
+      midis.forEach((m, i) => this.voice(inst, m, t0 + i * roll, dur, amp));
     });
   }
 
@@ -373,7 +375,7 @@ export class AudioEngine {
       const t0 = this.actx!.currentTime + 0.02;
       const amp = LEVEL[inst] * this.chordAmp(midis.length);
       midis.forEach((m, i) => {
-        const t = t0 + i * stagger;
+        const t = t0 + i * (inst === 'keys' ? stagger * this.keys.roll : stagger);
         this.held.push({ ...this.strike(inst, m, t, amp), start: t });
       });
     });
@@ -470,7 +472,9 @@ export class AudioEngine {
       if (immediate) p.value = v;
       else p.setTargetAtTime(v, t, 0.03);
     };
-    set(fx.room, f.room);
+    // the send is taken before the trim, so it is scaled with it: a preset's
+    // room is a proportion of its own level, not of the raw sample
+    set(fx.room, f.room * f.level);
     set(fx.level, f.level);
     set(fx.chorus, f.chorus);
     set(fx.tremRate, f.tremRate);

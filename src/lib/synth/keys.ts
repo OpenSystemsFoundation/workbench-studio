@@ -58,6 +58,10 @@ export interface KeysVoice {
   bite: number;
   /** level of the hammer thump */
   thump: number;
+  /** seconds the note takes to speak: a hard hammer tip is a pluck, a soft one a swell */
+  rise: number;
+  /** how much of a chord's strum is kept, 0…1: rolled like a harp, or landing together */
+  roll: number;
   /** top-end roll-off of the amp, in Hz */
   top: number;
   fx: KeysFx;
@@ -65,33 +69,35 @@ export interface KeysVoice {
 
 export const KEYS_VOICES: readonly KeysVoice[] = [
   {
-    // The lush one: a pickup voiced round, a long sustain, a clear bell on the
-    // attack, and the stereo vibrato and chorus that the sound is known for.
-    id: 'suitcase', name: 'Suitcase', hint: 'Lush and wide: round tines, a bell on the attack, stereo vibrato and chorus',
-    pickup: 'magnetic', depth: [0.58, 0.42], offset: [0.36, 0.5],
-    chime: 1.5, chimeRing: 1.4, sustain: 3.4, bite: 0.36, thump: 0.035, top: 5600,
-    fx: { tremRate: 4.3, tremPan: 0.55, tremAmp: 0, chorus: 0.4, room: 0.3, level: 0.55 },
+    // The lush one, voiced for neo-soul: soft hammer tips, so a note swells in
+    // rather than being plucked; almost no bell; little of the quick die-away
+    // after the strike, so it sits as a pad; a dark amp; chords that land
+    // together instead of rolling; and a slow, wide vibrato under deep chorus.
+    id: 'suitcase', name: 'Suitcase', hint: 'Lush and smooth: soft attack, long warm sustain, slow stereo vibrato and chorus',
+    pickup: 'magnetic', depth: [0.5, 0.36], offset: [0.36, 0.5],
+    chime: 0.35, chimeRing: 0.8, sustain: 3.8, bite: 0.18, thump: 0.015, rise: 0.011, roll: 0, top: 3600,
+    fx: { tremRate: 3.2, tremPan: 0.45, tremAmp: 0, chorus: 0.5, room: 0.32, level: 0.27 },
   },
   {
     // Straight into the desk: more bark, no effects.
     id: 'stage', name: 'Stage', hint: 'Dry and direct: more bark on the attack, no effects',
     pickup: 'magnetic', depth: [1.0, 0.6], offset: [0.55, 0.7],
-    chime: 1, chimeRing: 1, sustain: 2.4, bite: 0.5, thump: 0.05, top: 6500,
+    chime: 1, chimeRing: 1, sustain: 2.4, bite: 0.5, thump: 0.05, rise: 0.0025, roll: 0, top: 6500,
     fx: { tremRate: 4.3, tremPan: 0, tremAmp: 0, chorus: 0, room: 0.2, level: 1 },
   },
   {
     // The glassy 80s ballad voicing: all bell, a thin body, wide chorus.
     id: 'bell', name: 'Bell', hint: 'Glassy and bright: a strong bell over a light body, wide chorus',
     pickup: 'magnetic', depth: [0.6, 0.42], offset: [0.82, 0.9],
-    chime: 3.2, chimeRing: 2.2, sustain: 2.8, bite: 0.42, thump: 0.02, top: 9000,
-    fx: { tremRate: 0.9, tremPan: 0.3, tremAmp: 0, chorus: 0.55, room: 0.32, level: 0.8 },
+    chime: 3.2, chimeRing: 2.2, sustain: 2.8, bite: 0.42, thump: 0.02, rise: 0.0025, roll: 1, top: 9000,
+    fx: { tremRate: 0.9, tremPan: 0.3, tremAmp: 0, chorus: 0.55, room: 0.4, level: 0.8 },
   },
   {
     // The other electric piano: a reed, nasal and biting, with its throb.
     id: 'reed', name: 'Reed', hint: 'Nasal and punchy: a reed piano with its tremolo throb',
     pickup: 'reed', depth: [0.72, 0.5], offset: [0, 0],
-    chime: 0.5, chimeRing: 0.6, sustain: 1.5, bite: 0.45, thump: 0.07, top: 5000,
-    fx: { tremRate: 5.6, tremPan: 0, tremAmp: 0.32, chorus: 0, room: 0.18, level: 1.5 },
+    chime: 0.5, chimeRing: 0.6, sustain: 1.5, bite: 0.45, thump: 0.07, rise: 0.0025, roll: 0, top: 5000,
+    fx: { tremRate: 5.6, tremPan: 0, tremAmp: 0.32, chorus: 0, room: 0.12, level: 1.5 },
   },
 ];
 
@@ -179,9 +185,10 @@ export function renderKeys(midi: number, sampleRate: number, voice: KeysVoice = 
     out[i] += thump.step(rand() * 2 - 1) * voice.thump * Math.exp(-i / (0.006 * sr));
   }
 
-  // A hammer is felt, and stays on the tine for a couple of milliseconds: the
-  // note speaks quickly but does not begin on a step.
-  const rise = Math.floor(0.0025 * sr);
+  // A hammer is felt, and stays on the tine for a few milliseconds: the note
+  // speaks quickly but does not begin on a step — and the softer the tip, the
+  // longer it takes.
+  const rise = Math.floor(voice.rise * sr);
   for (let i = 0; i < rise; i++) out[i] *= 0.5 - 0.5 * Math.cos((Math.PI * i) / rise);
 
   // The amp and cabinet: nothing below the instrument's range, a gentle top.
